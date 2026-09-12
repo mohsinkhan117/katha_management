@@ -1,0 +1,88 @@
+# Katha Management — Complete To-Do
+
+## Phase 0 — Foundation
+```
+Init Flutter project, folder structure (`core/`, `features/`, `main.dart`) --------------------------------------- ⬜
+Add dependencies: sqflite, provider/riverpod, go_router, intl, path_provider -------------------------------------- ⬜
+Define all data models: `Party`, `Product`, `Order`, `OrderItem`, `Transaction`, `Invoice`, `Payment`, `BusinessProfile` -⬜
+Set up `sqflite` DB helper + versioned migrations ------------------------------------------------------------------ ⬜
+Create repository interfaces (Sqflite-backed) for each feature ------------------------------------------------------ ⬜
+App shell / routing (bottom nav: Dashboard, Parties, Orders, Ledger, Settings) --------------------------------------- ⬜
+App theme / `AppColors` palette (navy + gold) ----------------------------------------------------------------------- ⬜
+```
+
+## Phase 1 — Party (Customer) Module
+```
+Party list screen (search, filter by balance/tag, sort by name/balance) ------------------------------------------- ⬜
+Add/Edit Party form -------------------------------------------------------------------------------------------------- ⬜
+Party detail screen with running ledger (statement view) -------------------------------------------------------------- ⬜
+Quick actions from Party detail: Add Sale, Add Payment, Call, WhatsApp ------------------------------------------------- ⬜
+Opening balance handling ------------------------------------------------------------------------------------------------ ⬜
+```
+
+## Phase 2 — Product Module
+```
+Product list screen (search, category filter) ------------------------------------------------------------------------- ⬜
+Add/Edit Product form (name, unit, price, optional stock) --------------------------------------------------------------- ⬜
+Low-stock indicator (if stock tracking enabled) -------------------------------------------------------------------------- ⬜
+```
+
+## Phase 3 — Order & Sale Module
+```
+Create Order flow: pick Party → add Products (qty, price, discount) → auto totals ---------------------------------------- ⬜
+Order status flow (placed → confirmed → dispatched → delivered) ------------------------------------------------------------ ⬜
+Order list with status filters ------------------------------------------------------------------------------------------------ ⬜
+Convert Order → Invoice ------------------------------------------------------------------------------------------------------- ⬜
+Quick-sale flow (skip full order, straight to invoice) -------------------------------------------------------------------------- ⬜
+```
+
+## Phase 4 — Ledger, Invoice & Payment Module (Local MVP)
+```
+Transaction engine: every Sale/Payment/Return writes an immutable ledger entry ---------------------------------------------------- ⬜
+Party balance computation from ledger entries -------------------------------------------------------------------------------------- ⬜
+Invoice generation (PDF) with business profile header/logo --------------------------------------------------------------------------- ⬜
+Record Payment screen (full/partial, against one or multiple invoices) --------------------------------------------------------------- ⬜
+Dashboard: today's sales, today's collection, total receivables, top pending parties ---------------------------------------------------- ⬜
+Thermal receipt printing (esc_pos_utils_plus) for quick handover slips ----------------------------------------------------------------- ⬜
+Local backup/export (CSV/JSON export + restore) ------------------------------------------------------------------------------------------- ⬜
+Global search (party, order, invoice #) ------------------------------------------------------------------------------------------------------ ⬜
+🏁 Milestone: fully usable offline app (v1.0 release) ------------------------------------------------------------------------------------------- ⬜
+```
+
+## Phase 5 — Cloud Migration (Firebase)
+```
+Firebase project setup (FlutterFire config, google-services.json / iOS plist) ------------------------------------------------------------------ ⬜
+Integrate firebase_core, cloud_firestore, firebase_auth ------------------------------------------------------------------------------------------ ⬜
+Auth: simple sign-in (phone/email) tied to business owner ----------------------------------------------------------------------------------------- ⬜
+Add SyncMeta fields to all local models (isSynced, updatedAt, firestoreId, soft-delete) ------------------------------------------------------------- ⬜
+Build SyncService: push local changes → Firestore; pull remote changes → sqflite --------------------------------------------------------------------- ⬜
+Conflict resolution strategy (last-write-wins / manual merge for balances) ---------------------------------------------------------------------------- ⬜
+Background/periodic sync + manual "Sync Now" with status indicator ------------------------------------------------------------------------------------- ⬜
+Preserve offline-first behavior (local read/write always first) ------------------------------------------------------------------------------------------ ⬜
+```
+
+## Phase 6 — Multi-Device / Team Growth
+```
+Multiple staff logins under one business account (roles: Owner, Salesman) ---------------------------------------------------------------------------------- ⬜
+Permission scoping (salesman sees only assigned parties/orders) -------------------------------------------------------------------------------------------- ⬜
+Real-time updates via Firestore streams ----------------------------------------------------------------------------------------------------------------------- ⬜
+Push notifications (firebase_messaging) for payment reminders/order approvals ------------------------------------------------------------------------------------ ⬜
+```
+
+## Phase 7 — Analytics & Insights
+```
+Reports module: sales trend, top products, top customers, collection rate -------------------------------------------------------------------------------------- ⬜
+Charts (fl_chart): monthly sales, receivables aging (0-30/30-60/60+ days) --------------------------------------------------------------------------------------- ⬜
+Export reports (PDF/Excel) --------------------------------------------------------------------------------------------------------------------------------------- ⬜
+Smart reminders: auto-flag parties overdue beyond X days --------------------------------------------------------------------------------------------------------- ⬜
+```
+
+## Phase 8 — Polish & Scale
+```
+Dark mode ------------------------------------------------------------------------------------------------------------------------------------------------------- ⬜
+Multi-currency / multi-language support (Urdu/English) --------------------------------------------------------------------------------------------------------- ⬜
+Performance pass (pagination for large ledgers, DB indices) ------------------------------------------------------------------------------------------------------ ⬜
+Test coverage (unit tests for repositories, widget tests for critical flows) ------------------------------------------------------------------------------------- ⬜
+App icon, splash screen, store listing assets --------------------------------------------------------------------------------------------------------------------- ⬜
+Release build, signing, CI/CD (optional) -------------------------------------------------------------------------------------------------------------------------- ⬜
+```
