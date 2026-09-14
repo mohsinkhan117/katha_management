@@ -85,4 +85,4 @@ Performance pass (pagination for large ledgers, DB indices) --------------------
 Test coverage (unit tests for repositories, widget tests for critical flows) ------------------------------------------------------------------------------------- ⬜
 App icon, splash screen, store listing assets --------------------------------------------------------------------------------------------------------------------- ⬜
 Release build, signing, CI/CD (optional) -------------------------------------------------------------------------------------------------------------------------- ⬜
-```
+```f

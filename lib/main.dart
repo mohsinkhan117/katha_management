@@ -1,7 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/routes/routes_generator.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
+import 'package:katha_management/core/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/core/ui/dashboard/dashboard_view_model.dart';
+import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,18 +19,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return
-    //  MultiProvider(
-    //   providers: [
-    //     // ChangeNotifierProvider(create: (_) => SplashViewModel()),
-    //   ],
-    //   child:
-    MaterialApp(
-      title: 'Invoice-Generator',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+    return MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => DashboardViewModel())],
+      child: MaterialApp(
+        title: 'Katha_management',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.light,
+        initialRoute: DashboardView.routeName,
+        onGenerateRoute: RouterGenerator.onGenerateRoute,
+      ),
     );
   }
 }

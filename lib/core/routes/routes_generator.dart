@@ -1,6 +1,7 @@
 // lib/core/routes/routes_generator.dart
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/ui/dashboard/dashboard_view.dart';
 
 class RouterGenerator {
   static Route onGenerateRoute(RouteSettings settings) {
@@ -10,8 +11,8 @@ class RouterGenerator {
       // ======================================================
       // Core
       // ======================================================
-      // case HomeView.routeName:
-      //   return HomeView.route();
+      case DashboardView.routeName:
+        return DashboardView.route();
 
       default:
         return _errorRoute();

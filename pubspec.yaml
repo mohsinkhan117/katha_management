@@ -14,8 +14,7 @@ dependencies:
   permission_handler: ^13.0.1
   firebase_core: ^4.13.0
   provider: ^6.1.5+1
-  esc_pos_utils_plus: ^2.0.4
-  unified_esc_pos_printer: ^3.4.0
+  # esc_pos_utils_plus: ^2.0.4
   shared_preferences: ^2.5.3
   cloud_firestore: ^6.8.0
   sqflite: ^2.4.3
