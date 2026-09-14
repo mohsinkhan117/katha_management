@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/new_order/new_order_view.dart';
 import 'package:katha_management/ui/new_sale/new_sale_view.dart';
 
 class RouterGenerator {
@@ -18,6 +19,8 @@ class RouterGenerator {
       case NewSaleView.routeName:
         return NewSaleView.route();
 
+      case NewOrderView.routeName:
+        return NewOrderView.route();
       default:
         return _errorRoute();
     }

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/new_order/new_order_view.dart';
 import 'package:katha_management/ui/new_sale/new_sale_view.dart';
 import 'package:provider/provider.dart';
 
@@ -55,7 +56,6 @@ class DashboardView extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        // onPressed: () => Navigator.pushNamed(context, NewSaleView.routeName),
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => NewSaleView()),
@@ -168,18 +168,30 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const actions = [
-      (Icons.point_of_sale_outlined, 'New Sale'),
-      (Icons.receipt_long_outlined, 'New Order'),
-      (Icons.payments_outlined, 'Add Payment'),
-      (Icons.person_add_alt_outlined, 'Add Party'),
+    List actions = [
+      (
+        Icons.point_of_sale_outlined,
+        'New Sale',
+        Navigator.pushNamed(context, NewSaleView.routeName),
+      ),
+      (
+        Icons.receipt_long_outlined,
+        'New Order',
+        Navigator.pushNamed(context, NewOrderView.routeName),
+      ),
+      (Icons.payments_outlined, 'Add Payment', () {}),
+      (Icons.person_add_alt_outlined, 'Add Party', () {}),
     ];
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: actions
           .map(
-            (action) => _QuickActionButton(icon: action.$1, label: action.$2),
+            (action) => _QuickActionButton(
+              icon: action.$1,
+              label: action.$2,
+              onPressed: action.$3,
+            ),
           )
           .toList(),
     );
@@ -187,14 +199,19 @@ class _QuickActions extends StatelessWidget {
 }
 
 class _QuickActionButton extends StatelessWidget {
-  const _QuickActionButton({required this.icon, required this.label});
+  _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
   final IconData icon;
   final String label;
+  VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onPressed,
       borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
       child: Column(
         children: [
@@ -204,20 +221,10 @@ class _QuickActionButton extends StatelessWidget {
               gradient: AppColors.primaryLinerGradient,
               borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
             ),
-            child: Icon(
-              icon,
-              color: AppColors.textWhite,
-              size: AppSizes.iconMd,
-            ),
+            child: Icon(icon, size: AppSizes.iconMd),
           ),
           const SizedBox(height: AppSizes.xs),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: AppSizes.fontSizeSm,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          Text(label, style: const TextStyle(fontSize: AppSizes.fontSizeSm)),
         ],
       ),
     );
@@ -263,7 +270,7 @@ class _PendingPartiesList extends StatelessWidget {
   Widget build(BuildContext context) {
     if (parties.isEmpty) {
       return const Text(
-        'No pending balances 🎉',
+        'No pending balances ',
         style: TextStyle(color: AppColors.textSecondary),
       );
     }

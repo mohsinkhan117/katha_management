@@ -44,6 +44,7 @@ class AppDatabase {
 
   Future<void> _onCreate(Database db, int version) async {
     await _createSalesTables(db);
+    await _createOrdersTables(db);
     // Future modules add their CREATE TABLE calls here, e.g.:
     // await _createPartyTable(db);
     // await _createProductTable(db);
@@ -91,8 +92,48 @@ class AppDatabase {
       )
     ''');
 
-    await db.execute('CREATE INDEX idx_sale_items_saleId ON sale_items (saleId)');
+    await db.execute(
+      'CREATE INDEX idx_sale_items_saleId ON sale_items (saleId)',
+    );
     await db.execute('CREATE INDEX idx_sales_partyId ON sales (partyId)');
+  }
+
+  Future<void> _createOrdersTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE orders (
+        id TEXT PRIMARY KEY,
+        partyId TEXT,
+        partyName TEXT NOT NULL,
+        partyPhone TEXT,
+        orderDate TEXT NOT NULL,
+        expectedDeliveryDate TEXT,
+        totalAmount REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'placed',
+        note TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isSynced INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE order_items (
+        id TEXT PRIMARY KEY,
+        orderId TEXT NOT NULL,
+        productId TEXT,
+        productName TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        unitPrice REAL NOT NULL,
+        discount REAL NOT NULL DEFAULT 0,
+        FOREIGN KEY (orderId) REFERENCES orders (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_order_items_orderId ON order_items (orderId)',
+    );
+    await db.execute('CREATE INDEX idx_orders_partyId ON orders (partyId)');
+    await db.execute('CREATE INDEX idx_orders_status ON orders (status)');
   }
 
   Future<void> close() async {
