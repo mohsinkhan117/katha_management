@@ -5,6 +5,7 @@ import 'package:katha_management/core/routes/routes_generator.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/new_sale/new_sale_view_model.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
@@ -20,7 +21,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => DashboardViewModel())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
+        ChangeNotifierProvider(create: (_) => NewSaleViewModel()),
+      ],
       child: MaterialApp(
         title: 'Katha_management',
         debugShowCheckedModeBanner: false,

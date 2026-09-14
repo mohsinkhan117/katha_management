@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/new_sale/new_sale_view.dart';
 
 class RouterGenerator {
   static Route onGenerateRoute(RouteSettings settings) {
@@ -13,6 +14,9 @@ class RouterGenerator {
       // ======================================================
       case DashboardView.routeName:
         return DashboardView.route();
+
+      case NewSaleView.routeName:
+        return NewSaleView.route();
 
       default:
         return _errorRoute();
