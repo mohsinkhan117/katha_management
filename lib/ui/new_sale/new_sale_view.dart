@@ -1,0 +1,431 @@
+// lib/features/sale/presentation/new_sale_view.dart
+
+import 'package:flutter/material.dart';
+import 'package:katha_management/core/models/sale_item_model.dart';
+import 'package:katha_management/ui/new_sale/new_sale_view_model.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/constants/sizes/sizes.dart';
+import '../../core/theme/app_colors/app_colors.dart';
+
+class NewSaleView extends StatelessWidget {
+  static const routeName = '/new-sale-view';
+  static Route route() {
+    return MaterialPageRoute(
+      builder: (context) => NewSaleView(),
+      settings: RouteSettings(name: routeName),
+    );
+  }
+
+  const NewSaleView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => NewSaleViewModel(),
+      child: const _NewSaleViewBody(),
+    );
+  }
+}
+
+class _NewSaleViewBody extends StatefulWidget {
+  const _NewSaleViewBody();
+
+  @override
+  State<_NewSaleViewBody> createState() => _NewSaleViewBodyState();
+}
+
+class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
+  final _partyNameController = TextEditingController();
+  final _partyPhoneController = TextEditingController();
+  final _paidAmountController = TextEditingController();
+  final _noteController = TextEditingController();
+
+  @override
+  void dispose() {
+    _partyNameController.dispose();
+    _partyPhoneController.dispose();
+    _paidAmountController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<NewSaleViewModel>();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('New Sale')),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSizes.md),
+        children: [
+          const _SectionLabel('Party'),
+          const SizedBox(height: AppSizes.sm),
+          TextField(
+            controller: _partyNameController,
+            decoration: const InputDecoration(labelText: 'Party name *'),
+            onChanged: (value) => context.read<NewSaleViewModel>().setParty(
+              name: value,
+              phone: _partyPhoneController.text,
+            ),
+          ),
+          const SizedBox(height: AppSizes.sm),
+          TextField(
+            controller: _partyPhoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(labelText: 'Phone (optional)'),
+            onChanged: (value) => context.read<NewSaleViewModel>().setParty(
+              name: _partyNameController.text,
+              phone: value,
+            ),
+          ),
+          const SizedBox(height: AppSizes.spaceBtwSections),
+          const _SectionLabel('Items'),
+          const SizedBox(height: AppSizes.sm),
+          _ItemsList(items: vm.items),
+          const SizedBox(height: AppSizes.sm),
+          const _AddItemForm(),
+          const SizedBox(height: AppSizes.spaceBtwSections),
+          const _SectionLabel('Payment'),
+          const SizedBox(height: AppSizes.sm),
+          TextField(
+            controller: _paidAmountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Paid amount (optional)',
+            ),
+            onChanged: (value) => context
+                .read<NewSaleViewModel>()
+                .setPaidAmount(double.tryParse(value) ?? 0),
+          ),
+          const SizedBox(height: AppSizes.sm),
+          TextField(
+            controller: _noteController,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Note (optional)'),
+            onChanged: (value) =>
+                context.read<NewSaleViewModel>().setNote(value),
+          ),
+          const SizedBox(height: AppSizes.spaceBtwSections),
+          _TotalsCard(vm: vm),
+          if (vm.errorMessage != null) ...[
+            const SizedBox(height: AppSizes.sm),
+            Text(
+              vm.errorMessage!,
+              style: const TextStyle(color: AppColors.error),
+            ),
+          ],
+          const SizedBox(height: AppSizes.spaceBtwSections),
+          SizedBox(
+            width: double.infinity,
+            height: AppSizes.buttonHeight,
+            child: ElevatedButton(
+              onPressed: vm.isSaving || !vm.canSave
+                  ? null
+                  : () async {
+                      final saleVm = context.read<NewSaleViewModel>();
+                      final success = await saleVm.saveSale();
+                      if (!context.mounted) return;
+                      if (success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Sale saved')),
+                        );
+                        Navigator.of(context).pop();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.buttonPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSizes.buttonRadius),
+                ),
+              ),
+              child: vm.isSaving
+                  ? const SizedBox(
+                      height: AppSizes.iconMd,
+                      width: AppSizes.iconMd,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.textWhite,
+                      ),
+                    )
+                  : const Text(
+                      'Save Sale',
+                      style: TextStyle(color: AppColors.textWhite),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: AppSizes.fontSizeLg,
+        fontWeight: FontWeight.bold,
+        color: AppColors.textPrimary,
+      ),
+    );
+  }
+}
+
+class _ItemsList extends StatelessWidget {
+  const _ItemsList({required this.items});
+  final List<SaleItemModel> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSizes.sm),
+        child: Text(
+          'No items added yet',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Column(
+      children: List.generate(items.length, (index) {
+        final item = items[index];
+        return Card(
+          elevation: AppSizes.cardElevation,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+          ),
+          margin: const EdgeInsets.only(bottom: AppSizes.sm),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.sm,
+              vertical: AppSizes.xs,
+            ),
+            title: Text(
+              item.productName,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            subtitle: Text(
+              '${item.quantity} x Rs ${item.unitPrice.toStringAsFixed(0)}'
+              '${item.discount > 0 ? ' - Rs ${item.discount.toStringAsFixed(0)} disc.' : ''}',
+              style: const TextStyle(
+                fontSize: AppSizes.fontSizeSm,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Rs ${item.subtotal.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.close,
+                    color: AppColors.error,
+                    size: AppSizes.iconSm,
+                  ),
+                  onPressed: () =>
+                      context.read<NewSaleViewModel>().removeItem(index),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _AddItemForm extends StatefulWidget {
+  const _AddItemForm();
+
+  @override
+  State<_AddItemForm> createState() => _AddItemFormState();
+}
+
+class _AddItemFormState extends State<_AddItemForm> {
+  final _productController = TextEditingController();
+  final _qtyController = TextEditingController(text: '1');
+  final _priceController = TextEditingController();
+  final _discountController = TextEditingController(text: '0');
+
+  @override
+  void dispose() {
+    _productController.dispose();
+    _qtyController.dispose();
+    _priceController.dispose();
+    _discountController.dispose();
+    super.dispose();
+  }
+
+  void _handleAdd() {
+    final name = _productController.text.trim();
+    final qty = double.tryParse(_qtyController.text) ?? 0;
+    final price = double.tryParse(_priceController.text) ?? 0;
+    final discount = double.tryParse(_discountController.text) ?? 0;
+
+    if (name.isEmpty || qty <= 0 || price <= 0) return;
+
+    context.read<NewSaleViewModel>().addItem(
+      productName: name,
+      quantity: qty,
+      unitPrice: price,
+      discount: discount,
+    );
+
+    _productController.clear();
+    _qtyController.text = '1';
+    _priceController.clear();
+    _discountController.text = '0';
+    FocusScope.of(context).unfocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: AppSizes.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSizes.sm),
+        child: Column(
+          children: [
+            TextField(
+              controller: _productController,
+              decoration: const InputDecoration(labelText: 'Product name'),
+            ),
+            const SizedBox(height: AppSizes.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _qtyController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Qty'),
+                  ),
+                ),
+                const SizedBox(width: AppSizes.sm),
+                Expanded(
+                  child: TextField(
+                    controller: _priceController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Unit price'),
+                  ),
+                ),
+                const SizedBox(width: AppSizes.sm),
+                Expanded(
+                  child: TextField(
+                    controller: _discountController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Discount'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSizes.sm),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _handleAdd,
+                icon: const Icon(Icons.add, color: AppColors.secondary),
+                label: const Text(
+                  'Add Item',
+                  style: TextStyle(color: AppColors.secondary),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TotalsCard extends StatelessWidget {
+  const _TotalsCard({required this.vm});
+  final NewSaleViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: AppSizes.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.cardRadiusMd),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSizes.md),
+        child: Column(
+          children: [
+            _TotalsRow(label: 'Total', value: vm.totalAmount),
+            const SizedBox(height: AppSizes.xs),
+            _TotalsRow(label: 'Paid', value: vm.paidAmount),
+            const Divider(height: AppSizes.spaceBtwItems),
+            _TotalsRow(
+              label: 'Balance Due',
+              value: vm.balanceDue,
+              emphasize: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TotalsRow extends StatelessWidget {
+  const _TotalsRow({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  final String label;
+  final double value;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: emphasize ? AppSizes.fontSizeLg : AppSizes.fontSizeMd,
+            fontWeight: emphasize ? FontWeight.bold : FontWeight.normal,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        Text(
+          'Rs ${value.toStringAsFixed(0)}',
+          style: TextStyle(
+            fontSize: emphasize ? AppSizes.fontSizeLg : AppSizes.fontSizeMd,
+            fontWeight: FontWeight.bold,
+            color: emphasize ? AppColors.tetraColor : AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}

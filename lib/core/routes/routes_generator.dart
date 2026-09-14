@@ -1,7 +1,7 @@
 // lib/core/routes/routes_generator.dart
 
 import 'package:flutter/material.dart';
-import 'package:katha_management/core/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/dashboard/dashboard_view.dart';
 
 class RouterGenerator {
   static Route onGenerateRoute(RouteSettings settings) {

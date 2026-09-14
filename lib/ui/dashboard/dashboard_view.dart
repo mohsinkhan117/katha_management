@@ -1,11 +1,12 @@
 // lib/features/home/presentation/home_view.dart
 
 import 'package:flutter/material.dart';
-import 'package:katha_management/core/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/new_sale/new_sale_view.dart';
 import 'package:provider/provider.dart';
 
-import '../../constants/sizes/sizes.dart';
-import '../../theme/app_colors/app_colors.dart';
+import '../../core/constants/sizes/sizes.dart';
+import '../../core/theme/app_colors/app_colors.dart';
 
 class DashboardView extends StatelessWidget {
   static const String routeName = '/dashboard_view';
@@ -54,7 +55,12 @@ class DashboardView extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        // onPressed: () => Navigator.pushNamed(context, NewSaleView.routeName),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => NewSaleView()),
+        ),
+
         icon: const Icon(Icons.add),
         label: const Text('New Sale'),
       ),

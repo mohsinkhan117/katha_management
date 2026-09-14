@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/routes/routes_generator.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
-import 'package:katha_management/core/ui/dashboard/dashboard_view.dart';
-import 'package:katha_management/core/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
