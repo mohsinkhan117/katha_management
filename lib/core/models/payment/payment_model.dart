@@ -1,4 +1,4 @@
-// lib/features/payment/data/models/payment_model.dart
+// lib\core\models\payment\payment_model.dart
 
 import 'package:uuid/uuid.dart';
 

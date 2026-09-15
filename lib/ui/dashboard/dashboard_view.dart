@@ -1,6 +1,7 @@
 // lib/features/home/presentation/home_view.dart
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/ui/add_payment/payment_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
 import 'package:katha_management/ui/new_order/new_order_view.dart';
 import 'package:katha_management/ui/new_sale/new_sale_view.dart';
@@ -179,7 +180,11 @@ class _QuickActions extends StatelessWidget {
         'New Order',
         () => Navigator.pushNamed(context, NewOrderView.routeName),
       ),
-      (Icons.payments_outlined, 'Add Payment', () {}),
+      (
+        Icons.payments_outlined,
+        'Add Payment',
+        () => Navigator.pushNamed(context, PaymentView.routeName),
+      ),
       (Icons.person_add_alt_outlined, 'Add Party', () {}),
     ];
 
