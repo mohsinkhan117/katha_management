@@ -45,6 +45,7 @@ class AppDatabase {
   Future<void> _onCreate(Database db, int version) async {
     await _createSalesTables(db);
     await _createOrdersTables(db);
+    await _createPaymentsTables(db);
     // Future modules add their CREATE TABLE calls here, e.g.:
     // await _createPartyTable(db);
     // await _createProductTable(db);
@@ -134,6 +135,45 @@ class AppDatabase {
     );
     await db.execute('CREATE INDEX idx_orders_partyId ON orders (partyId)');
     await db.execute('CREATE INDEX idx_orders_status ON orders (status)');
+  }
+
+  Future<void> _createPaymentsTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE payments (
+        id TEXT PRIMARY KEY,
+        partyId TEXT,
+        partyName TEXT NOT NULL,
+        partyPhone TEXT,
+        amount REAL NOT NULL,
+        paymentDate TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'cash',
+        note TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isSynced INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    // Links a payment to the sale(s) it settles, in whole or in part.
+    // A payment with zero rows here is a pure on-account advance.
+    await db.execute('''
+      CREATE TABLE payment_allocations (
+        id TEXT PRIMARY KEY,
+        paymentId TEXT NOT NULL,
+        saleId TEXT NOT NULL,
+        amountApplied REAL NOT NULL,
+        FOREIGN KEY (paymentId) REFERENCES payments (id) ON DELETE CASCADE,
+        FOREIGN KEY (saleId) REFERENCES sales (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('CREATE INDEX idx_payments_partyId ON payments (partyId)');
+    await db.execute(
+      'CREATE INDEX idx_payment_allocations_paymentId ON payment_allocations (paymentId)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_payment_allocations_saleId ON payment_allocations (saleId)',
+    );
   }
 
   Future<void> close() async {

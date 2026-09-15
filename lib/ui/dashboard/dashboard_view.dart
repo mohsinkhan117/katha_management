@@ -172,12 +172,12 @@ class _QuickActions extends StatelessWidget {
       (
         Icons.point_of_sale_outlined,
         'New Sale',
-        Navigator.pushNamed(context, NewSaleView.routeName),
+        () => Navigator.pushNamed(context, NewSaleView.routeName),
       ),
       (
         Icons.receipt_long_outlined,
         'New Order',
-        Navigator.pushNamed(context, NewOrderView.routeName),
+        () => Navigator.pushNamed(context, NewOrderView.routeName),
       ),
       (Icons.payments_outlined, 'Add Payment', () {}),
       (Icons.person_add_alt_outlined, 'Add Party', () {}),
