@@ -361,61 +361,55 @@ class _PendingPartyTile extends StatelessWidget {
     final days = party.daysSinceOldestDue;
     final isOverdue = days != null && days > 7;
 
-    return Card(
-      elevation: AppSizes.cardElevation,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.sm,
+        vertical: AppSizes.xs,
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.sm,
-          vertical: AppSizes.xs,
+      leading: CircleAvatar(
+        backgroundColor: AppColors.lightContainer,
+        child: Text(
+          party.partyName.isNotEmpty ? party.partyName[0] : '?',
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.lightContainer,
-          child: Text(
-            party.partyName.isNotEmpty ? party.partyName[0] : '?',
+      ),
+      title: Text(
+        party.partyName,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      subtitle: Text(
+        party.partyPhone ?? 'No phone on file',
+        style: const TextStyle(
+          fontSize: AppSizes.fontSizeSm,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'Rs ${party.balanceDue.toStringAsFixed(0)}',
             style: const TextStyle(
-              color: AppColors.primary,
               fontWeight: FontWeight.bold,
+              color: AppColors.tetraColor,
             ),
           ),
-        ),
-        title: Text(
-          party.partyName,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          party.partyPhone ?? 'No phone on file',
-          style: const TextStyle(
-            fontSize: AppSizes.fontSizeSm,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              'Rs ${party.balanceDue.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.tetraColor,
-              ),
+          const SizedBox(height: AppSizes.xs),
+          Text(
+            days != null ? '${days}d overdue' : 'Opening balance',
+            style: TextStyle(
+              fontSize: AppSizes.fontSizeSm,
+              color: isOverdue ? AppColors.error : AppColors.warning,
             ),
-            const SizedBox(height: AppSizes.xs),
-            Text(
-              days != null ? '${days}d overdue' : 'Opening balance',
-              style: TextStyle(
-                fontSize: AppSizes.fontSizeSm,
-                color: isOverdue ? AppColors.error : AppColors.warning,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -477,42 +471,36 @@ class _ActivityTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color, label) = _typeMeta;
 
-    return Card(
-      elevation: AppSizes.cardElevation,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.sm,
+        vertical: AppSizes.xs,
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.sm,
-          vertical: AppSizes.xs,
+      leading: CircleAvatar(
+        backgroundColor: color.withValues(alpha: 0.12),
+        child: Icon(icon, color: color, size: AppSizes.iconSm),
+      ),
+      title: Text(
+        item.partyName,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
         ),
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.12),
-          child: Icon(icon, color: color, size: AppSizes.iconSm),
+      ),
+      subtitle: Text(
+        '$label • ${_formatTime(item.date)}',
+        style: const TextStyle(
+          fontSize: AppSizes.fontSizeSm,
+          color: AppColors.textSecondary,
         ),
-        title: Text(
-          item.partyName,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          '$label • ${_formatTime(item.date)}',
-          style: const TextStyle(
-            fontSize: AppSizes.fontSizeSm,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        trailing: Text(
-          'Rs ${item.amount.toStringAsFixed(0)}',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: item.type == ActivityType.payment
-                ? AppColors.success
-                : AppColors.textPrimary,
-          ),
+      ),
+      trailing: Text(
+        'Rs ${item.amount.toStringAsFixed(0)}',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: item.type == ActivityType.payment
+              ? AppColors.success
+              : AppColors.textPrimary,
         ),
       ),
     );
