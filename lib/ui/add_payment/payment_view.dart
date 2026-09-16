@@ -55,7 +55,7 @@ class _PaymentViewState extends State<PaymentView> {
             onRefresh: () => viewModel.loadPayments(partyId: widget.partyId),
             child: ListView.separated(
               itemCount: viewModel.payments.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final payment = viewModel.payments[index];
                 return Dismissible(
@@ -212,8 +212,9 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               ),
               validator: (value) {
                 final parsed = double.tryParse(value ?? '');
-                if (parsed == null || parsed <= 0)
+                if (parsed == null || parsed <= 0) {
                   return 'Enter a valid amount';
+                }
                 return null;
               },
             ),

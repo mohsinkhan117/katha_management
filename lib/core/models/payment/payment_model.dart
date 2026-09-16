@@ -2,6 +2,8 @@
 
 import 'package:uuid/uuid.dart';
 
+import 'payment_allocation_model.dart';
+
 enum PaymentMode { cash, bankTransfer, cheque, online, other }
 
 extension PaymentModeX on PaymentMode {
@@ -30,10 +32,11 @@ extension PaymentModeX on PaymentMode {
   }
 }
 
-/// A payment received from a party. May be fully or partially
-/// allocated against outstanding sales via [PaymentAllocationModel] —
-/// any amount left unallocated is treated as an on-account credit
-/// (an advance) for that party.
+/// A payment received from a party.
+///
+/// [allocations] record which sale(s) this payment settled, in whole
+/// or in part. `amount - totalAllocated` is money left on account —
+/// an advance the party has paid that isn't yet applied to a bill.
 class PaymentModel {
   final String id;
   final String? partyId;
@@ -42,6 +45,7 @@ class PaymentModel {
   final double amount;
   final DateTime paymentDate;
   final PaymentMode mode;
+  final List<PaymentAllocationModel> allocations;
   final String? note;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -55,14 +59,20 @@ class PaymentModel {
     required this.amount,
     DateTime? paymentDate,
     this.mode = PaymentMode.cash,
+    this.allocations = const [],
     this.note,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isSynced = false,
-  }) : id = id ?? const Uuid().v4(),
-       paymentDate = paymentDate ?? DateTime.now(),
-       createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
+  })  : id = id ?? const Uuid().v4(),
+        paymentDate = paymentDate ?? DateTime.now(),
+        createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
+
+  double get totalAllocated =>
+      allocations.fold(0, (sum, a) => sum + a.amountApplied);
+
+  double get unallocatedAmount => amount - totalAllocated;
 
   Map<String, dynamic> toMap() {
     return {
@@ -80,7 +90,12 @@ class PaymentModel {
     };
   }
 
-  factory PaymentModel.fromMap(Map<String, dynamic> map) {
+  /// `allocations` is passed in separately since it comes from the
+  /// `payment_allocations` table, not the `payments` row itself.
+  factory PaymentModel.fromMap(
+    Map<String, dynamic> map, {
+    List<PaymentAllocationModel> allocations = const [],
+  }) {
     return PaymentModel(
       id: map['id'] as String,
       partyId: map['partyId'] as String?,
@@ -89,6 +104,7 @@ class PaymentModel {
       amount: (map['amount'] as num).toDouble(),
       paymentDate: DateTime.parse(map['paymentDate'] as String),
       mode: PaymentModeX.fromString(map['mode'] as String),
+      allocations: allocations,
       note: map['note'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),

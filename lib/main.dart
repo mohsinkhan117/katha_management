@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/routes/routes_generator.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
-import 'package:katha_management/ui/add_payment/payment_view.dart';
+import 'package:katha_management/ui/add_party/add_party_view_model.dart';
 import 'package:katha_management/ui/add_payment/payment_view_model.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
@@ -29,6 +29,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NewSaleViewModel()),
         ChangeNotifierProvider(create: (_) => NewOrderViewModel()),
         ChangeNotifierProvider(create: (_) => PaymentViewModel()),
+        ChangeNotifierProvider(create: (_) => AddPartyViewModel()),
       ],
       child: MaterialApp(
         title: 'Katha_management',

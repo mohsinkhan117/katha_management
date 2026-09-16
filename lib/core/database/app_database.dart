@@ -43,11 +43,11 @@ class AppDatabase {
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    await _createPartiesTable(db);
     await _createSalesTables(db);
     await _createOrdersTables(db);
     await _createPaymentsTables(db);
     // Future modules add their CREATE TABLE calls here, e.g.:
-    // await _createPartyTable(db);
     // await _createProductTable(db);
   }
 
@@ -55,11 +55,30 @@ class AppDatabase {
     // Example of how future schema changes should be layered in:
     //
     // if (oldVersion < 2) {
-    //   await _createPartyTable(db);
+    //   await _createProductTable(db);
     // }
     // if (oldVersion < 3) {
     //   await db.execute('ALTER TABLE sales ADD COLUMN orderId TEXT');
     // }
+  }
+
+  Future<void> _createPartiesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE parties (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT,
+        address TEXT,
+        openingBalance REAL NOT NULL DEFAULT 0,
+        tag TEXT,
+        note TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isSynced INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('CREATE INDEX idx_parties_name ON parties (name)');
   }
 
   Future<void> _createSalesTables(Database db) async {
