@@ -8,14 +8,14 @@ import 'package:katha_management/ui/new_order/new_order_view.dart';
 import 'package:katha_management/ui/new_sale/new_sale_view.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/constants/sizes/sizes.dart';
-import '../../core/theme/app_colors/app_colors.dart';
+import '../../../core/constants/sizes/sizes.dart';
+import '../../../core/theme/app_colors/app_colors.dart';
 
 class DashboardView extends StatelessWidget {
-  static const String routeName = '/dashboard_view';
+  static const String routeName = '/dashboard-view';
   static Route route() {
     return MaterialPageRoute(
-      builder: (context) => const DashboardView(),
+      builder: (context) => DashboardView(),
       settings: RouteSettings(name: routeName),
     );
   }
@@ -24,14 +24,23 @@ class DashboardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => DashboardViewmodel(),
+      child: const _HomeViewBody(),
+    );
+  }
+}
+
+class _HomeViewBody extends StatelessWidget {
+  const _HomeViewBody();
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(Provider.of<DashboardViewModel>(context).businessName),
-        leading: Text(''),
-      ),
-      body: Consumer<DashboardViewModel>(
+      appBar: AppBar(title: const Text('Dashboard'), leading: Text('')),
+      body: Consumer<DashboardViewmodel>(
         builder: (context, vm, _) {
-          if (vm.isLoading) {
+          if (vm.isLoading && vm.totalPartiesCount == 0) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -40,6 +49,10 @@ class DashboardView extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(AppSizes.md),
               children: [
+                if (vm.errorMessage != null) ...[
+                  _ErrorBanner(message: vm.errorMessage!),
+                  const SizedBox(height: AppSizes.spaceBtwSections),
+                ],
                 _SummaryCards(vm: vm),
                 const SizedBox(height: AppSizes.spaceBtwSections),
                 const _QuickActions(),
@@ -50,7 +63,7 @@ class DashboardView extends StatelessWidget {
                 const SizedBox(height: AppSizes.spaceBtwSections),
                 const _SectionHeader(title: 'Recent Activity'),
                 const SizedBox(height: AppSizes.spaceBtwItems),
-                _RecentTransactionsList(transactions: vm.recentTransactions),
+                _RecentActivityList(items: vm.recentActivity),
                 const SizedBox(height: AppSizes.spaceBtwSections),
               ],
             ),
@@ -58,11 +71,7 @@ class DashboardView extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NewSaleView()),
-        ),
-
+        onPressed: () {},
         icon: const Icon(Icons.add),
         label: const Text('New Sale'),
       ),
@@ -70,9 +79,44 @@ class DashboardView extends StatelessWidget {
   }
 }
 
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.sm),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline,
+            color: AppColors.error,
+            size: AppSizes.iconSm,
+          ),
+          const SizedBox(width: AppSizes.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: AppSizes.fontSizeSm,
+                color: AppColors.error,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SummaryCards extends StatelessWidget {
   const _SummaryCards({required this.vm});
-  final DashboardViewModel vm;
+  final DashboardViewmodel vm;
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +214,7 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    List actions = [
+    final actions = [
       (
         Icons.point_of_sale_outlined,
         'New Sale',
@@ -231,10 +275,20 @@ class _QuickActionButton extends StatelessWidget {
               gradient: AppColors.primaryLinerGradient,
               borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
             ),
-            child: Icon(icon, size: AppSizes.iconMd),
+            child: Icon(
+              icon,
+              color: AppColors.textWhite,
+              size: AppSizes.iconMd,
+            ),
           ),
           const SizedBox(height: AppSizes.xs),
-          Text(label, style: const TextStyle(fontSize: AppSizes.fontSizeSm)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: AppSizes.fontSizeSm,
+              color: AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );
@@ -242,7 +296,7 @@ class _QuickActionButton extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title}) : onSeeAll = null;
+  const _SectionHeader({required this.title, this.onSeeAll});
   final String title;
   final VoidCallback? onSeeAll;
 
@@ -274,13 +328,13 @@ class _SectionHeader extends StatelessWidget {
 
 class _PendingPartiesList extends StatelessWidget {
   const _PendingPartiesList({required this.parties});
-  final List<DummyPendingParty> parties;
+  final List<PartyBalanceSummary> parties;
 
   @override
   Widget build(BuildContext context) {
     if (parties.isEmpty) {
       return const Text(
-        'No pending balances ',
+        'No pending balances',
         style: TextStyle(color: AppColors.textSecondary),
       );
     }
@@ -300,66 +354,80 @@ class _PendingPartiesList extends StatelessWidget {
 
 class _PendingPartyTile extends StatelessWidget {
   const _PendingPartyTile({required this.party});
-  final DummyPendingParty party;
+  final PartyBalanceSummary party;
 
   @override
   Widget build(BuildContext context) {
-    final isOverdue = party.daysOverdue > 7;
+    final days = party.daysSinceOldestDue;
+    final isOverdue = days != null && days > 7;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.sm,
-        vertical: AppSizes.xs,
+    return Card(
+      elevation: AppSizes.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
       ),
-      leading: CircleAvatar(
-        child: Text(
-          party.name.isNotEmpty ? party.name[0] : '?',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.sm,
+          vertical: AppSizes.xs,
         ),
-      ),
-      title: Text(
-        party.name,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        party.phone,
-        style: const TextStyle(
-          fontSize: AppSizes.fontSizeSm,
-          color: AppColors.textSecondary,
-        ),
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            'Rs ${party.balanceDue.toStringAsFixed(0)}',
+        leading: CircleAvatar(
+          backgroundColor: AppColors.lightContainer,
+          child: Text(
+            party.partyName.isNotEmpty ? party.partyName[0] : '?',
             style: const TextStyle(
+              color: AppColors.primary,
               fontWeight: FontWeight.bold,
-              color: AppColors.tetraColor,
             ),
           ),
-          const SizedBox(height: AppSizes.xs),
-          Text(
-            '${party.daysOverdue}d overdue',
-            style: TextStyle(
-              fontSize: AppSizes.fontSizeSm,
-              color: isOverdue ? AppColors.error : AppColors.warning,
-            ),
+        ),
+        title: Text(
+          party.partyName,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
-        ],
+        ),
+        subtitle: Text(
+          party.partyPhone ?? 'No phone on file',
+          style: const TextStyle(
+            fontSize: AppSizes.fontSizeSm,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'Rs ${party.balanceDue.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.tetraColor,
+              ),
+            ),
+            const SizedBox(height: AppSizes.xs),
+            Text(
+              days != null ? '${days}d overdue' : 'Opening balance',
+              style: TextStyle(
+                fontSize: AppSizes.fontSizeSm,
+                color: isOverdue ? AppColors.error : AppColors.warning,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _RecentTransactionsList extends StatelessWidget {
-  const _RecentTransactionsList({required this.transactions});
-  final List<DummyTransaction> transactions;
+class _RecentActivityList extends StatelessWidget {
+  const _RecentActivityList({required this.items});
+  final List<ActivityItem> items;
 
   @override
   Widget build(BuildContext context) {
-    if (transactions.isEmpty) {
+    if (items.isEmpty) {
       return const Text(
         'No recent activity',
         style: TextStyle(color: AppColors.textSecondary),
@@ -367,11 +435,11 @@ class _RecentTransactionsList extends StatelessWidget {
     }
 
     return Column(
-      children: transactions
+      children: items
           .map(
-            (t) => Padding(
+            (item) => Padding(
               padding: const EdgeInsets.only(bottom: AppSizes.sm),
-              child: _TransactionTile(transaction: t),
+              child: _ActivityTile(item: item),
             ),
           )
           .toList(),
@@ -379,18 +447,22 @@ class _RecentTransactionsList extends StatelessWidget {
   }
 }
 
-class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.transaction});
-  final DummyTransaction transaction;
+class _ActivityTile extends StatelessWidget {
+  const _ActivityTile({required this.item});
+  final ActivityItem item;
 
   (IconData, Color, String) get _typeMeta {
-    switch (transaction.type) {
-      case DummyTransactionType.sale:
+    switch (item.type) {
+      case ActivityType.sale:
         return (Icons.arrow_upward_rounded, AppColors.primary, 'Sale');
-      case DummyTransactionType.payment:
+      case ActivityType.payment:
         return (Icons.arrow_downward_rounded, AppColors.success, 'Payment');
-      case DummyTransactionType.returnItem:
-        return (Icons.undo_rounded, AppColors.tetraColor, 'Return');
+      case ActivityType.order:
+        return (
+          Icons.receipt_long_outlined,
+          AppColors.secondary,
+          'Order Placed',
+        );
     }
   }
 
@@ -405,36 +477,42 @@ class _TransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color, label) = _typeMeta;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.sm,
-        vertical: AppSizes.xs,
+    return Card(
+      elevation: AppSizes.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
       ),
-      leading: CircleAvatar(
-        backgroundColor: color.withValues(alpha: 0.12),
-        child: Icon(icon, color: color, size: AppSizes.iconSm),
-      ),
-      title: Text(
-        transaction.partyName,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.sm,
+          vertical: AppSizes.xs,
         ),
-      ),
-      subtitle: Text(
-        '$label • ${_formatTime(transaction.date)}',
-        style: const TextStyle(
-          fontSize: AppSizes.fontSizeSm,
-          color: AppColors.textSecondary,
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.12),
+          child: Icon(icon, color: color, size: AppSizes.iconSm),
         ),
-      ),
-      trailing: Text(
-        'Rs ${transaction.amount.toStringAsFixed(0)}',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: transaction.type == DummyTransactionType.payment
-              ? AppColors.success
-              : AppColors.textPrimary,
+        title: Text(
+          item.partyName,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        subtitle: Text(
+          '$label • ${_formatTime(item.date)}',
+          style: const TextStyle(
+            fontSize: AppSizes.fontSizeSm,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        trailing: Text(
+          'Rs ${item.amount.toStringAsFixed(0)}',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: item.type == ActivityType.payment
+                ? AppColors.success
+                : AppColors.textPrimary,
+          ),
         ),
       ),
     );
