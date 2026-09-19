@@ -7,6 +7,7 @@ import 'package:katha_management/ui/add_party/add_party_view_model.dart';
 import 'package:katha_management/ui/add_payment/payment_view_model.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/navigation_bar/navigattion_bar_view.dart';
 import 'package:katha_management/ui/new_order/new_order_view_model.dart';
 import 'package:katha_management/ui/new_sale/new_sale_view_model.dart';
 import 'package:provider/provider.dart';
@@ -37,7 +38,7 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.light,
-        initialRoute: DashboardView.routeName,
+        initialRoute: NavigationBarView.routeName,
         onGenerateRoute: RouterGenerator.onGenerateRoute,
       ),
     );

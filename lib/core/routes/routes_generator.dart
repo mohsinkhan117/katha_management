@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:katha_management/ui/add_party/add_party_view.dart';
 import 'package:katha_management/ui/add_payment/payment_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/navigation_bar/navigattion_bar_view.dart';
 import 'package:katha_management/ui/new_order/new_order_view.dart';
 import 'package:katha_management/ui/new_sale/new_sale_view.dart';
 
@@ -15,6 +16,9 @@ class RouterGenerator {
       // ======================================================
       // Core
       // ======================================================
+      case NavigationBarView.routeName:
+        return NavigationBarView.route();
+
       case DashboardView.routeName:
         return DashboardView.route();
 

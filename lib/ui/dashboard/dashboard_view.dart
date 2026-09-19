@@ -337,7 +337,7 @@ class _PendingPartiesList extends StatelessWidget {
         'No pending balances',
         style: TextStyle(color: AppColors.textSecondary),
       );
-    }
+    } 
 
     return Column(
       children: parties
