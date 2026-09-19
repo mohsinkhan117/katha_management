@@ -2,11 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/models/party_model.dart';
-import 'package:katha_management/ui/add_party/add_party_view_model.dart';
+import 'package:katha_management/ui/features/add_party/add_party_view_model.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/constants/sizes/sizes.dart';
-import '../../../core/theme/app_colors/app_colors.dart';
+import '../../../../core/constants/sizes/sizes.dart';
+import '../../../../core/theme/app_colors/app_colors.dart';
 
 class AddPartyView extends StatelessWidget {
   static const String routeName = '/add-party-view';
@@ -167,7 +167,9 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Party added')),
                         );
-                        Navigator.of(context).pop();
+                        if (Navigator.canPop(context)) {
+                          Navigator.of(context).pop();
+                        }
                       }
                     },
               style: ElevatedButton.styleFrom(

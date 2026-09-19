@@ -1,22 +1,23 @@
-// lib/features/home/presentation/home_view.dart
+// lib/ui/dashboard/dashboard_view.dart
 
 import 'package:flutter/material.dart';
-import 'package:katha_management/ui/add_party/add_party_view.dart';
-import 'package:katha_management/ui/add_payment/payment_view.dart';
+import 'package:katha_management/core/constants/sizes/sizes.dart';
+import 'package:katha_management/core/models/party_balance_summary.dart';
+import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
-import 'package:katha_management/ui/new_order/new_order_view.dart';
-import 'package:katha_management/ui/new_sale/new_sale_view.dart';
+import 'package:katha_management/ui/features/add_party/add_party_view.dart';
+import 'package:katha_management/ui/features/add_payment/payment_view.dart';
+import 'package:katha_management/ui/features/new_order/new_order_view.dart';
+import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
+import 'package:katha_management/ui/party_history/party_history_view.dart';
 import 'package:provider/provider.dart';
-
-import '../../../core/constants/sizes/sizes.dart';
-import '../../../core/theme/app_colors/app_colors.dart';
 
 class DashboardView extends StatelessWidget {
   static const String routeName = '/dashboard-view';
   static Route route() {
     return MaterialPageRoute(
-      builder: (context) => DashboardView(),
-      settings: RouteSettings(name: routeName),
+      builder: (context) => const DashboardView(),
+      settings: const RouteSettings(name: routeName),
     );
   }
 
@@ -37,7 +38,7 @@ class _HomeViewBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard'), leading: Text('')),
+      appBar: AppBar(title: const Text('Dashboard')),
       body: Consumer<DashboardViewmodel>(
         builder: (context, vm, _) {
           if (vm.isLoading && vm.totalPartiesCount == 0) {
@@ -71,7 +72,12 @@ class _HomeViewBody extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: () async {
+          await Navigator.pushNamed(context, NewSaleView.routeName);
+          if (context.mounted) {
+            context.read<DashboardViewmodel>().refresh();
+          }
+        },
         icon: const Icon(Icons.add),
         label: const Text('New Sale'),
       ),
@@ -218,22 +224,42 @@ class _QuickActions extends StatelessWidget {
       (
         Icons.point_of_sale_outlined,
         'New Sale',
-        () => Navigator.pushNamed(context, NewSaleView.routeName),
+        () async {
+          await Navigator.pushNamed(context, NewSaleView.routeName);
+          if (context.mounted) {
+            context.read<DashboardViewmodel>().refresh();
+          }
+        },
       ),
       (
         Icons.receipt_long_outlined,
         'New Order',
-        () => Navigator.pushNamed(context, NewOrderView.routeName),
+        () async {
+          await Navigator.pushNamed(context, NewOrderView.routeName);
+          if (context.mounted) {
+            context.read<DashboardViewmodel>().refresh();
+          }
+        },
       ),
       (
         Icons.payments_outlined,
         'Add Payment',
-        () => Navigator.pushNamed(context, PaymentView.routeName),
+        () async {
+          await Navigator.pushNamed(context, PaymentView.routeName);
+          if (context.mounted) {
+            context.read<DashboardViewmodel>().refresh();
+          }
+        },
       ),
       (
         Icons.person_add_alt_outlined,
         'Add Party',
-        () => Navigator.pushNamed(context, AddPartyView.routeName),
+        () async {
+          await Navigator.pushNamed(context, AddPartyView.routeName);
+          if (context.mounted) {
+            context.read<DashboardViewmodel>().refresh();
+          }
+        },
       ),
     ];
 
@@ -253,14 +279,14 @@ class _QuickActions extends StatelessWidget {
 }
 
 class _QuickActionButton extends StatelessWidget {
-  _QuickActionButton({
+  const _QuickActionButton({
     required this.icon,
     required this.label,
     required this.onPressed,
   });
   final IconData icon;
   final String label;
-  VoidCallback onPressed;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -296,32 +322,18 @@ class _QuickActionButton extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.onSeeAll});
+  const _SectionHeader({required this.title});
   final String title;
-  final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: AppSizes.fontSizeLg,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        if (onSeeAll != null)
-          TextButton(
-            onPressed: onSeeAll,
-            child: const Text(
-              'See all',
-              style: TextStyle(color: AppColors.secondary),
-            ),
-          ),
-      ],
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: AppSizes.fontSizeLg,
+        fontWeight: FontWeight.bold,
+        color: AppColors.textPrimary,
+      ),
     );
   }
 }
@@ -337,7 +349,7 @@ class _PendingPartiesList extends StatelessWidget {
         'No pending balances',
         style: TextStyle(color: AppColors.textSecondary),
       );
-    } 
+    }
 
     return Column(
       children: parties
@@ -361,55 +373,71 @@ class _PendingPartyTile extends StatelessWidget {
     final days = party.daysSinceOldestDue;
     final isOverdue = days != null && days > 7;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.sm,
-        vertical: AppSizes.xs,
+    return Card(
+      elevation: AppSizes.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
       ),
-      leading: CircleAvatar(
-        backgroundColor: AppColors.lightContainer,
-        child: Text(
-          party.partyName.isNotEmpty ? party.partyName[0] : '?',
-          style: const TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
-          ),
+      child: ListTile(
+        onTap: () async {
+          await Navigator.pushNamed(
+            context,
+            PartyHistoryView.routeName,
+            arguments: party.partyId,
+          );
+          if (context.mounted) {
+            context.read<DashboardViewmodel>().refresh();
+          }
+        },
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.sm,
+          vertical: AppSizes.xs,
         ),
-      ),
-      title: Text(
-        party.partyName,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      subtitle: Text(
-        party.partyPhone ?? 'No phone on file',
-        style: const TextStyle(
-          fontSize: AppSizes.fontSizeSm,
-          color: AppColors.textSecondary,
-        ),
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            'Rs ${party.balanceDue.toStringAsFixed(0)}',
+        leading: CircleAvatar(
+          backgroundColor: AppColors.lightContainer,
+          child: Text(
+            party.partyName.isNotEmpty ? party.partyName[0] : '?',
             style: const TextStyle(
+              color: AppColors.primary,
               fontWeight: FontWeight.bold,
-              color: AppColors.tetraColor,
             ),
           ),
-          const SizedBox(height: AppSizes.xs),
-          Text(
-            days != null ? '${days}d overdue' : 'Opening balance',
-            style: TextStyle(
-              fontSize: AppSizes.fontSizeSm,
-              color: isOverdue ? AppColors.error : AppColors.warning,
-            ),
+        ),
+        title: Text(
+          party.partyName,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
-        ],
+        ),
+        subtitle: Text(
+          party.partyPhone ?? 'No phone on file',
+          style: const TextStyle(
+            fontSize: AppSizes.fontSizeSm,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'Rs ${party.balanceDue.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.tetraColor,
+              ),
+            ),
+            const SizedBox(height: AppSizes.xs),
+            Text(
+              days != null ? '${days}d overdue' : 'Opening balance',
+              style: TextStyle(
+                fontSize: AppSizes.fontSizeSm,
+                color: isOverdue ? AppColors.error : AppColors.warning,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

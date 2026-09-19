@@ -1,144 +1,152 @@
-// lib/features/order/presentation/new_order_view.dart
+// lib/ui/features/new_sale/new_sale_view.dart
 
 import 'package:flutter/material.dart';
-import 'package:katha_management/core/models/new_order/new_order_item_model.dart';
-import 'package:katha_management/ui/new_order/new_order_view_model.dart';
+import 'package:katha_management/core/constants/sizes/sizes.dart';
+import 'package:katha_management/core/models/party_model.dart';
+import 'package:katha_management/core/models/sale_item_model.dart';
+import 'package:katha_management/core/theme/app_colors/app_colors.dart';
+import 'package:katha_management/ui/features/new_sale/new_sale_view_model.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/constants/sizes/sizes.dart';
-import '../../../core/theme/app_colors/app_colors.dart';
-
-class NewOrderView extends StatelessWidget {
-  static const routeName = '/new-order-view';
-  static Route route() {
+class NewSaleView extends StatelessWidget {
+  static const routeName = '/new-sale-view';
+  static Route route({String? partyId}) {
     return MaterialPageRoute(
-      builder: (context) => NewOrderView(),
-      settings: RouteSettings(name: routeName),
+      builder: (context) => NewSaleView(partyId: partyId),
+      settings: RouteSettings(name: routeName, arguments: partyId),
     );
   }
 
-  const NewOrderView({super.key});
+  const NewSaleView({super.key, this.partyId});
+  final String? partyId;
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => NewOrderViewModel(),
-      child: const _NewOrderViewBody(),
+      create: (_) => NewSaleViewModel(initialPartyId: partyId),
+      child: const _NewSaleViewBody(),
     );
   }
 }
 
-class _NewOrderViewBody extends StatefulWidget {
-  const _NewOrderViewBody();
+class _NewSaleViewBody extends StatefulWidget {
+  const _NewSaleViewBody();
 
   @override
-  State<_NewOrderViewBody> createState() => _NewOrderViewBodyState();
+  State<_NewSaleViewBody> createState() => _NewSaleViewBodyState();
 }
 
-class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
+class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
   final _partyNameController = TextEditingController();
   final _partyPhoneController = TextEditingController();
+  final _paidAmountController = TextEditingController();
   final _noteController = TextEditingController();
 
   @override
   void dispose() {
     _partyNameController.dispose();
     _partyPhoneController.dispose();
+    _paidAmountController.dispose();
     _noteController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickDeliveryDate(BuildContext context) async {
-    final vm = context.read<NewOrderViewModel>();
-    final now = DateTime.now();
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: vm.expectedDeliveryDate ?? now,
-      firstDate: now.subtract(const Duration(days: 1)),
-      lastDate: now.add(const Duration(days: 365)),
-    );
-
-    if (picked != null) {
-      vm.setExpectedDeliveryDate(picked);
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}-'
-        '${date.month.toString().padLeft(2, '0')}-'
-        '${date.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<NewOrderViewModel>();
+    final vm = context.watch<NewSaleViewModel>();
+
+    if (vm.linkedParty != null) {
+      if (_partyNameController.text != vm.partyName) {
+        _partyNameController.text = vm.partyName;
+      }
+      if (_partyPhoneController.text != vm.partyPhone) {
+        _partyPhoneController.text = vm.partyPhone;
+      }
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New Order')),
+      appBar: AppBar(title: const Text('New Sale')),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
-          const _StatusBadge(),
-          const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel('Party'),
+          const _SectionLabel('Party Details'),
           const SizedBox(height: AppSizes.sm),
-          TextField(
-            controller: _partyNameController,
-            decoration: const InputDecoration(labelText: 'Party name *'),
-            onChanged: (value) => context.read<NewOrderViewModel>().setParty(
-              name: value,
-              phone: _partyPhoneController.text,
+
+          if (vm.linkedParty != null) ...[
+            _LinkedPartyCard(
+              party: vm.linkedParty!,
+              onClear: () {
+                vm.clearSelectedParty();
+                _partyNameController.clear();
+                _partyPhoneController.clear();
+              },
             ),
-          ),
-          const SizedBox(height: AppSizes.sm),
-          TextField(
-            controller: _partyPhoneController,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Phone (optional)'),
-            onChanged: (value) => context.read<NewOrderViewModel>().setParty(
-              name: _partyNameController.text,
-              phone: value,
-            ),
-          ),
-          const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel('Expected Delivery'),
-          const SizedBox(height: AppSizes.sm),
-          InkWell(
-            onTap: () => _pickDeliveryDate(context),
-            borderRadius: BorderRadius.circular(AppSizes.inputFieldRadius),
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Delivery date (optional)',
-                suffixIcon: Icon(
-                  Icons.calendar_today_outlined,
-                  size: AppSizes.iconSm,
-                ),
+          ] else ...[
+            if (vm.availableParties.isNotEmpty) ...[
+              _PartyPickerDropdown(
+                parties: vm.availableParties,
+                onSelected: (party) {
+                  vm.selectParty(party);
+                  _partyNameController.text = party.name;
+                  _partyPhoneController.text = party.phone ?? '';
+                },
               ),
-              child: Text(
-                vm.expectedDeliveryDate != null
-                    ? _formatDate(vm.expectedDeliveryDate!)
-                    : 'Not set',
-                style: const TextStyle(color: AppColors.textPrimary),
-              ),
+              const SizedBox(height: AppSizes.sm),
+            ],
+            TextField(
+              controller: _partyNameController,
+              decoration: const InputDecoration(labelText: 'Party name *'),
+              onChanged: (value) =>
+                  context.read<NewSaleViewModel>().setPartyManual(
+                    name: value,
+                    phone: _partyPhoneController.text,
+                  ),
             ),
-          ),
+            const SizedBox(height: AppSizes.sm),
+            TextField(
+              controller: _partyPhoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Phone (optional)'),
+              onChanged: (value) =>
+                  context.read<NewSaleViewModel>().setPartyManual(
+                    name: _partyNameController.text,
+                    phone: value,
+                  ),
+            ),
+          ],
+
           const SizedBox(height: AppSizes.spaceBtwSections),
           const _SectionLabel('Items'),
           const SizedBox(height: AppSizes.sm),
           _ItemsList(items: vm.items),
           const SizedBox(height: AppSizes.sm),
           const _AddItemForm(),
+
           const SizedBox(height: AppSizes.spaceBtwSections),
+          const _SectionLabel('Payment & Settlement'),
+          const SizedBox(height: AppSizes.sm),
+          TextField(
+            controller: _paidAmountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Paid amount upfront (optional)',
+              helperText: 'Will automatically be credited & recorded to ledger',
+            ),
+            onChanged: (value) => context
+                .read<NewSaleViewModel>()
+                .setPaidAmount(double.tryParse(value) ?? 0),
+          ),
+          const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _noteController,
             maxLines: 2,
             decoration: const InputDecoration(labelText: 'Note (optional)'),
             onChanged: (value) =>
-                context.read<NewOrderViewModel>().setNote(value),
+                context.read<NewSaleViewModel>().setNote(value),
           ),
+
           const SizedBox(height: AppSizes.spaceBtwSections),
-          _TotalCard(totalAmount: vm.totalAmount, itemCount: vm.items.length),
+          _TotalsCard(vm: vm),
           if (vm.errorMessage != null) ...[
             const SizedBox(height: AppSizes.sm),
             Text(
@@ -154,14 +162,18 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
               onPressed: vm.isSaving || !vm.canSave
                   ? null
                   : () async {
-                      final orderVm = context.read<NewOrderViewModel>();
-                      final success = await orderVm.saveOrder();
+                      final saleVm = context.read<NewSaleViewModel>();
+                      final success = await saleVm.saveSale();
                       if (!context.mounted) return;
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Order placed')),
+                          const SnackBar(
+                            content: Text('Sale saved successfully'),
+                          ),
                         );
-                        Navigator.of(context).pop();
+                        if (Navigator.canPop(context)) {
+                          Navigator.of(context).pop();
+                        }
                       }
                     },
               style: ElevatedButton.styleFrom(
@@ -180,7 +192,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                       ),
                     )
                   : const Text(
-                      'Place Order',
+                      'Save Sale',
                       style: TextStyle(color: AppColors.textWhite),
                     ),
             ),
@@ -191,38 +203,78 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge();
+class _LinkedPartyCard extends StatelessWidget {
+  const _LinkedPartyCard({required this.party, required this.onClear});
+  final PartyModel party;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.sm,
-        vertical: AppSizes.xs,
+    return Card(
+      elevation: AppSizes.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
       ),
-      decoration: BoxDecoration(
-        color: AppColors.secondary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.radio_button_checked,
-            color: AppColors.secondary,
-            size: AppSizes.iconXs,
-          ),
-          const SizedBox(width: AppSizes.xs),
-          Text(
-            'New orders start as Placed',
+      color: AppColors.primary.withValues(alpha: 0.05),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary,
+          child: Text(
+            party.name.isNotEmpty ? party.name[0] : '?',
             style: const TextStyle(
-              fontSize: AppSizes.fontSizeSm,
-              color: AppColors.textSecondary,
+              color: AppColors.textWhite,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ],
+        ),
+        title: Text(
+          party.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        subtitle: Text(
+          party.phone ?? 'No phone on file',
+          style: const TextStyle(
+            fontSize: AppSizes.fontSizeSm,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.close, size: AppSizes.iconSm),
+          onPressed: onClear,
+          tooltip: 'Change Party',
+        ),
       ),
+    );
+  }
+}
+
+class _PartyPickerDropdown extends StatelessWidget {
+  const _PartyPickerDropdown({required this.parties, required this.onSelected});
+
+  final List<PartyModel> parties;
+  final ValueChanged<PartyModel> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<PartyModel>(
+      decoration: const InputDecoration(
+        labelText: 'Select Existing Customer',
+        prefixIcon: Icon(Icons.person_outline),
+      ),
+      items: parties.map((party) {
+        return DropdownMenuItem<PartyModel>(
+          value: party,
+          child: Text(
+            '${party.name}${party.phone != null ? ' (${party.phone})' : ''}',
+          ),
+        );
+      }).toList(),
+      onChanged: (party) {
+        if (party != null) onSelected(party);
+      },
     );
   }
 }
@@ -246,7 +298,7 @@ class _SectionLabel extends StatelessWidget {
 
 class _ItemsList extends StatelessWidget {
   const _ItemsList({required this.items});
-  final List<OrderItemModel> items;
+  final List<SaleItemModel> items;
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +358,7 @@ class _ItemsList extends StatelessWidget {
                     size: AppSizes.iconSm,
                   ),
                   onPressed: () =>
-                      context.read<NewOrderViewModel>().removeItem(index),
+                      context.read<NewSaleViewModel>().removeItem(index),
                 ),
               ],
             ),
@@ -347,7 +399,7 @@ class _AddItemFormState extends State<_AddItemForm> {
 
     if (name.isEmpty || qty <= 0 || price <= 0) return;
 
-    context.read<NewOrderViewModel>().addItem(
+    context.read<NewSaleViewModel>().addItem(
       productName: name,
       quantity: qty,
       unitPrice: price,
@@ -429,10 +481,9 @@ class _AddItemFormState extends State<_AddItemForm> {
   }
 }
 
-class _TotalCard extends StatelessWidget {
-  const _TotalCard({required this.totalAmount, required this.itemCount});
-  final double totalAmount;
-  final int itemCount;
+class _TotalsCard extends StatelessWidget {
+  const _TotalsCard({required this.vm});
+  final NewSaleViewModel vm;
 
   @override
   Widget build(BuildContext context) {
@@ -443,27 +494,57 @@ class _TotalCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSizes.md),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
           children: [
-            Text(
-              '$itemCount item${itemCount == 1 ? '' : 's'}',
-              style: const TextStyle(
-                fontSize: AppSizes.fontSizeMd,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            Text(
-              'Rs ${totalAmount.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: AppSizes.fontSizeLg,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+            _TotalsRow(label: 'Total', value: vm.totalAmount),
+            const SizedBox(height: AppSizes.xs),
+            _TotalsRow(label: 'Paid', value: vm.paidAmount),
+            const Divider(height: AppSizes.spaceBtwItems),
+            _TotalsRow(
+              label: 'Balance Due',
+              value: vm.balanceDue,
+              emphasize: true,
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TotalsRow extends StatelessWidget {
+  const _TotalsRow({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  final String label;
+  final double value;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: emphasize ? AppSizes.fontSizeLg : AppSizes.fontSizeMd,
+            fontWeight: emphasize ? FontWeight.bold : FontWeight.normal,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        Text(
+          'Rs ${value.toStringAsFixed(0)}',
+          style: TextStyle(
+            fontSize: emphasize ? AppSizes.fontSizeLg : AppSizes.fontSizeMd,
+            fontWeight: FontWeight.bold,
+            color: emphasize ? AppColors.tetraColor : AppColors.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }

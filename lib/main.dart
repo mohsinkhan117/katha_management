@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/routes/routes_generator.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
-import 'package:katha_management/ui/add_party/add_party_view_model.dart';
-import 'package:katha_management/ui/add_payment/payment_view_model.dart';
-import 'package:katha_management/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/customers/customers_view_model.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/features/add_party/add_party_view_model.dart';
+import 'package:katha_management/ui/features/add_payment/payment_view_model.dart';
+import 'package:katha_management/ui/features/new_order/new_order_view_model.dart';
+import 'package:katha_management/ui/features/new_sale/new_sale_view_model.dart';
 import 'package:katha_management/ui/navigation_bar/navigattion_bar_view.dart';
-import 'package:katha_management/ui/new_order/new_order_view_model.dart';
-import 'package:katha_management/ui/new_sale/new_sale_view_model.dart';
+import 'package:katha_management/ui/orders/order_view_model.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
@@ -27,10 +28,12 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => DashboardViewmodel()),
+        ChangeNotifierProvider(create: (_) => OrderViewModel()),
         ChangeNotifierProvider(create: (_) => NewSaleViewModel()),
         ChangeNotifierProvider(create: (_) => NewOrderViewModel()),
         ChangeNotifierProvider(create: (_) => PaymentViewModel()),
         ChangeNotifierProvider(create: (_) => AddPartyViewModel()),
+        ChangeNotifierProvider(create: (_) => CustomersViewModel()),
       ],
       child: MaterialApp(
         title: 'Katha_management',

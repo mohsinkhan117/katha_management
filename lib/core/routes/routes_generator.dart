@@ -1,12 +1,15 @@
 // lib/core/routes/routes_generator.dart
 
 import 'package:flutter/material.dart';
-import 'package:katha_management/ui/add_party/add_party_view.dart';
-import 'package:katha_management/ui/add_payment/payment_view.dart';
+import 'package:katha_management/ui/customers/customers_view.dart';
+import 'package:katha_management/ui/features/add_party/add_party_view.dart';
+import 'package:katha_management/ui/features/add_payment/payment_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
 import 'package:katha_management/ui/navigation_bar/navigattion_bar_view.dart';
-import 'package:katha_management/ui/new_order/new_order_view.dart';
-import 'package:katha_management/ui/new_sale/new_sale_view.dart';
+import 'package:katha_management/ui/features/new_order/new_order_view.dart';
+import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
+import 'package:katha_management/ui/orders/orders_view.dart';
+import 'package:katha_management/ui/party_history/party_history_view.dart';
 
 class RouterGenerator {
   static Route onGenerateRoute(RouteSettings settings) {
@@ -22,14 +25,31 @@ class RouterGenerator {
       case DashboardView.routeName:
         return DashboardView.route();
 
+      //CustomersView
+
+      case CustomersView.routeName:
+        return CustomersView.route();
+
+      case PartyHistoryView.routeName:
+        final partyId = (settings.arguments is String)
+            ? settings.arguments as String
+            : '';
+        return PartyHistoryView.route(partyId: partyId);
+
+      case OrdersView.routeName:
+        return OrdersView.route();
+
       case NewSaleView.routeName:
-        return NewSaleView.route();
+        final partyId = settings.arguments as String?;
+        return NewSaleView.route(partyId: partyId);
 
       case NewOrderView.routeName:
-        return NewOrderView.route();
+        final partyId = settings.arguments as String?;
+        return NewOrderView.route(partyId: partyId);
 
       case PaymentView.routeName:
-        return PaymentView.route();
+        final partyId = settings.arguments as String?;
+        return PaymentView.route(partyId: partyId);
 
       case AddPartyView.routeName:
         return AddPartyView.route();

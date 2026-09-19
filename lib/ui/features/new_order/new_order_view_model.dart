@@ -1,28 +1,37 @@
-// lib/features/order/logic/new_order_view_model.dart
+// lib/ui/features/new_order/new_order_view_model.dart
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/models/new_order/new_order_item_model.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
+import 'package:katha_management/core/models/party_model.dart';
 import 'package:katha_management/features/order/data/repositories/order_repository.dart';
 import 'package:katha_management/features/order/data/repositories/sqflite_order_repository.dart';
+import 'package:katha_management/features/party/data/repositories/party_repository.dart';
+import 'package:katha_management/features/party/data/repositories/sqflite_party_repository.dart';
 
-/// Drives the New Order form.
-///
-/// Depends on [OrderRepository] (the interface), not on
-/// [SqfliteOrderRepository] directly — a mock repository can be passed
-/// in for tests, and a Firestore/sync repository can replace it later
-/// without touching this class.
+/// Drives the New Order form with complete party linking.
 class NewOrderViewModel extends ChangeNotifier {
-  NewOrderViewModel({OrderRepository? repository})
-    : _repository = repository ?? SqfliteOrderRepository();
+  NewOrderViewModel({
+    String? initialPartyId,
+    OrderRepository? repository,
+    PartyRepository? partyRepository,
+  }) : _repository = repository ?? SqfliteOrderRepository(),
+       _partyRepository = partyRepository ?? SqflitePartyRepository(),
+       selectedPartyId = initialPartyId {
+    _init(initialPartyId);
+  }
 
   final OrderRepository _repository;
+  final PartyRepository _partyRepository;
 
-  // ─── Party (manual entry for now — swap for a Party picker once the
-  // Party module/Phase 1 exists; nothing else here needs to change) ──
+  // ─── Party details ─────────────────────────────────────────────────
   String? selectedPartyId;
   String partyName = '';
   String partyPhone = '';
+  PartyModel? linkedParty;
+
+  List<PartyModel> availableParties = [];
+  bool isLoadingParties = false;
 
   DateTime? expectedDeliveryDate;
   String? note;
@@ -37,8 +46,46 @@ class NewOrderViewModel extends ChangeNotifier {
   double get totalAmount => _items.fold(0, (sum, item) => sum + item.subtotal);
   bool get canSave => partyName.trim().isNotEmpty && _items.isNotEmpty;
 
-  void setParty({String? id, required String name, String? phone}) {
-    selectedPartyId = id;
+  Future<void> _init(String? partyId) async {
+    isLoadingParties = true;
+    notifyListeners();
+
+    try {
+      availableParties = await _partyRepository.getAllParties();
+
+      if (partyId != null) {
+        final party = await _partyRepository.getPartyById(partyId);
+        if (party != null) {
+          selectParty(party);
+        }
+      }
+    } catch (_) {
+      // Fallback
+    } finally {
+      isLoadingParties = false;
+      notifyListeners();
+    }
+  }
+
+  void selectParty(PartyModel party) {
+    selectedPartyId = party.id;
+    linkedParty = party;
+    partyName = party.name;
+    partyPhone = party.phone ?? '';
+    notifyListeners();
+  }
+
+  void clearSelectedParty() {
+    selectedPartyId = null;
+    linkedParty = null;
+    partyName = '';
+    partyPhone = '';
+    notifyListeners();
+  }
+
+  void setPartyManual({required String name, String? phone}) {
+    selectedPartyId = null;
+    linkedParty = null;
     partyName = name;
     partyPhone = phone ?? '';
     notifyListeners();
@@ -63,7 +110,7 @@ class NewOrderViewModel extends ChangeNotifier {
   }) {
     _items.add(
       OrderItemModel(
-        orderId: '', // linked to the real order id in saveOrder()
+        orderId: '', // linked to real order id in saveOrder()
         productId: productId,
         productName: productName,
         quantity: quantity,
@@ -94,15 +141,13 @@ class NewOrderViewModel extends ChangeNotifier {
       final order = OrderModel(
         partyId: selectedPartyId,
         partyName: partyName.trim(),
-        partyPhone: partyPhone.trim(),
+        partyPhone: partyPhone.trim().isEmpty ? null : partyPhone.trim(),
         expectedDeliveryDate: expectedDeliveryDate,
         items: _items,
         status: OrderStatus.placed,
         note: note,
       );
 
-      // Items were created before the order existed, so re-point them
-      // at the order's generated id right before persisting.
       final finalOrder = order.copyWith(
         items: _items.map((item) => item.attachToOrder(order.id)).toList(),
       );
@@ -121,6 +166,7 @@ class NewOrderViewModel extends ChangeNotifier {
 
   void _resetForm() {
     selectedPartyId = null;
+    linkedParty = null;
     partyName = '';
     partyPhone = '';
     expectedDeliveryDate = null;

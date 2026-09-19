@@ -33,8 +33,12 @@ class SqflitePaymentRepository implements PaymentRepository {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
-      for (final allocation in allocations) {
-        await _applyAllocation(txn, allocation);
+      if (allocations.isNotEmpty) {
+        for (final allocation in allocations) {
+          await _applyAllocation(txn, allocation);
+        }
+      } else {
+        await _autoAllocateFifo(txn, payment);
       }
     });
   }
@@ -154,10 +158,60 @@ class SqflitePaymentRepository implements PaymentRepository {
     return amount - allocated;
   }
 
+  /// Automatically applies a payment against the party's oldest unpaid sales
+  /// in FIFO (First-In, First-Out) order. Any remaining balance stays unallocated
+  /// as an advance on account.
+  Future<void> _autoAllocateFifo(
+    DatabaseExecutor txn,
+    PaymentModel payment,
+  ) async {
+    String whereClause;
+    List<dynamic> whereArgs;
+
+    if (payment.partyId != null && payment.partyId!.isNotEmpty) {
+      whereClause = 'partyId = ? AND paidAmount < totalAmount';
+      whereArgs = [payment.partyId];
+    } else {
+      whereClause = 'LOWER(partyName) = ? AND paidAmount < totalAmount';
+      whereArgs = [payment.partyName.trim().toLowerCase()];
+    }
+
+    final unpaidSales = await txn.query(
+      _salesTable,
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'saleDate ASC, createdAt ASC',
+    );
+
+    double remainingToAllocate = payment.amount;
+
+    for (final saleRow in unpaidSales) {
+      if (remainingToAllocate <= 0) break;
+
+      final saleId = saleRow['id'] as String;
+      final totalAmount = (saleRow['totalAmount'] as num).toDouble();
+      final paidAmount = (saleRow['paidAmount'] as num).toDouble();
+      final balanceDue = totalAmount - paidAmount;
+
+      if (balanceDue <= 0) continue;
+
+      final applyAmount = remainingToAllocate < balanceDue
+          ? remainingToAllocate
+          : balanceDue;
+
+      final allocation = PaymentAllocationModel(
+        paymentId: payment.id,
+        saleId: saleId,
+        amountApplied: applyAmount,
+      );
+
+      await _applyAllocation(txn, allocation);
+      remainingToAllocate -= applyAmount;
+    }
+  }
+
   /// Inserts the allocation row and rolls the amount into the target
-  /// sale's `paidAmount`, bumping `status` to `paid` once it's fully
-  /// covered. Runs inside the caller's transaction so a partial
-  /// failure never leaves the sale and allocation out of sync.
+  /// sale's `paidAmount`, bumping `status` to `paid` or `partial`.
   Future<void> _applyAllocation(
     DatabaseExecutor txn,
     PaymentAllocationModel allocation,
@@ -180,7 +234,9 @@ class SqflitePaymentRepository implements PaymentRepository {
     final currentPaid = (saleRows.first['paidAmount'] as num).toDouble();
     final totalAmount = (saleRows.first['totalAmount'] as num).toDouble();
     final newPaid = currentPaid + allocation.amountApplied;
-    final newStatus = newPaid >= totalAmount ? 'paid' : 'pending';
+    final newStatus = newPaid >= totalAmount
+        ? 'paid'
+        : (newPaid > 0 ? 'partial' : 'pending');
 
     await txn.update(
       _salesTable,
