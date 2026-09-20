@@ -12,8 +12,9 @@ import 'package:katha_management/features/sale/data/repositories/sqflite_sale_re
 /// ViewModel driving the Orders screen.
 ///
 /// Categorizes orders into Pending (placed, confirmed, dispatched)
-/// and Done (delivered, cancelled), and allows advancing lifecycle status,
-/// searching, cancelling, or converting delivered orders into sales.
+/// and Done (delivered, cancelled), and allows advancing lifecycle
+/// status, searching, cancelling, or converting delivered orders into
+/// sales.
 class OrderViewModel extends ChangeNotifier {
   OrderViewModel({
     OrderRepository? orderRepository,
@@ -106,7 +107,8 @@ class OrderViewModel extends ChangeNotifier {
 
   Future<void> refresh() => loadOrders();
 
-  /// Advances the order to its next logical status (e.g. placed -> confirmed -> dispatched -> delivered).
+  /// Advances the order to its next logical status (placed -> confirmed
+  /// -> dispatched -> delivered).
   Future<bool> advanceStatus(OrderModel order) async {
     final nextStatus = order.status.next;
     if (nextStatus == null) return false;
@@ -136,7 +138,21 @@ class OrderViewModel extends ChangeNotifier {
   }
 
   /// Converts an order into a Sale/Invoice.
+  ///
+  /// Guarded by `order.convertedSaleId`: once an order has produced a
+  /// sale, this returns `false` immediately rather than creating a
+  /// second one. This check lives here — not just as a hidden button
+  /// in the View — because a UI-only guard doesn't protect against a
+  /// fast double-tap landing before the first call's rebuild disables
+  /// it, or against some future second entry point calling this
+  /// method directly.
   Future<bool> convertToSale(OrderModel order) async {
+    if (order.convertedSaleId != null) {
+      _errorMessage = 'This order has already been converted to a sale.';
+      notifyListeners();
+      return false;
+    }
+
     try {
       final saleItems = order.items.map((item) {
         return SaleItemModel(
@@ -163,7 +179,17 @@ class OrderViewModel extends ChangeNotifier {
       );
 
       await _saleRepository.createSale(finalSale);
-      await _orderRepository.updateOrderStatus(order.id, OrderStatus.delivered);
+
+      // Status and the conversion link are written together in one
+      // update — if these were two separate repository calls, a
+      // failure between them could leave an order marked "delivered"
+      // with no record of which sale it produced, or vice versa.
+      final updatedOrder = order.copyWith(
+        status: OrderStatus.delivered,
+        convertedSaleId: finalSale.id,
+      );
+      await _orderRepository.updateOrder(updatedOrder);
+
       await loadOrders();
       return true;
     } catch (e) {

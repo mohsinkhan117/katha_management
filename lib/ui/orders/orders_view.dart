@@ -40,6 +40,7 @@ class _OrdersViewBody extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
+          automaticallyImplyLeading: false,
           title: const Text('Orders'),
           bottom: TabBar(
             indicatorColor: AppColors.primary,
@@ -225,6 +226,7 @@ class _OrderCard extends StatefulWidget {
 
 class _OrderCardState extends State<_OrderCard> {
   bool _isExpanded = false;
+  bool _isConverting = false;
 
   Color _getStatusColor(OrderStatus status) {
     switch (status) {
@@ -249,11 +251,35 @@ class _OrderCardState extends State<_OrderCard> {
     return DateFormat('dd MMM yyyy').format(dt);
   }
 
+  Future<void> _handleConvertToSale(OrderModel order, OrderViewModel vm) async {
+    // Local guard against a fast double-tap firing this twice before
+    // the widget rebuilds — the real guard lives in the ViewModel
+    // (`order.convertedSaleId`), this just avoids a redundant call.
+    if (_isConverting) return;
+    setState(() => _isConverting = true);
+
+    final success = await vm.convertToSale(order);
+
+    if (!mounted) return;
+    setState(() => _isConverting = false);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order converted to Sale invoice')),
+      );
+    } else if (vm.errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(vm.errorMessage!)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
     final statusColor = _getStatusColor(order.status);
     final vm = context.read<OrderViewModel>();
+    final alreadyConverted = order.convertedSaleId != null;
 
     return Card(
       elevation: AppSizes.cardElevation,
@@ -461,76 +487,41 @@ class _OrderCardState extends State<_OrderCard> {
                 ),
                 const Spacer(),
                 if (!order.status.isTerminal) ...[
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: AppSizes.iconSm),
-                    onSelected: (value) async {
-                      if (value == 'cancel') {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Cancel Order?'),
-                            content: const Text(
-                              'Are you sure you want to cancel this order?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('No'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('Yes, Cancel'),
-                              ),
-                            ],
+                  // "Convert to Sale" removed from here: converting an
+                  // order to a sale only makes sense once it has
+                  // actually been delivered. Cancel is the only
+                  // action available before then.
+                  IconButton(
+                    icon: const Icon(
+                      Icons.cancel_outlined,
+                      size: AppSizes.iconSm,
+                      color: AppColors.error,
+                    ),
+                    tooltip: 'Cancel order',
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Cancel Order?'),
+                          content: const Text(
+                            'Are you sure you want to cancel this order?',
                           ),
-                        );
-                        if (confirm == true) {
-                          await vm.cancelOrder(order.id);
-                        }
-                      } else if (value == 'convert_sale') {
-                        final success = await vm.convertToSale(order);
-                        if (context.mounted && success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Order converted to Sale invoice'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('No'),
                             ),
-                          );
-                        }
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Yes, Cancel'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await vm.cancelOrder(order.id);
                       }
                     },
-                    itemBuilder: (ctx) => [
-                      const PopupMenuItem(
-                        value: 'convert_sale',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.point_of_sale_outlined,
-                              size: AppSizes.iconSm,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: AppSizes.xs),
-                            Text('Convert to Sale'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'cancel',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.cancel_outlined,
-                              size: AppSizes.iconSm,
-                              color: AppColors.error,
-                            ),
-                            SizedBox(width: AppSizes.xs),
-                            Text(
-                              'Cancel Order',
-                              style: TextStyle(color: AppColors.error),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                   const SizedBox(width: AppSizes.xs),
                   ElevatedButton(
@@ -552,30 +543,65 @@ class _OrderCardState extends State<_OrderCard> {
                     ),
                   ),
                 ] else if (order.status == OrderStatus.delivered) ...[
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final success = await vm.convertToSale(order);
-                      if (context.mounted && success) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Order converted to Sale invoice'),
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.point_of_sale_outlined,
-                      size: AppSizes.iconSm,
-                    ),
-                    label: const Text('Convert to Sale'),
-                    style: OutlinedButton.styleFrom(
+                  if (alreadyConverted)
+                    // Once converted, this is the only state this
+                    // order can ever show here again — no button,
+                    // nothing tappable, just a fact about its history.
+                    Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSizes.sm,
                         vertical: AppSizes.xs,
                       ),
-                      minimumSize: const Size(80, 32),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.borderRadiusSm,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: AppSizes.iconSm,
+                            color: AppColors.success,
+                          ),
+                          SizedBox(width: AppSizes.xs),
+                          Text(
+                            'Converted to Sale',
+                            style: TextStyle(
+                              fontSize: AppSizes.fontSizeSm,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    OutlinedButton.icon(
+                      onPressed: _isConverting
+                          ? null
+                          : () => _handleConvertToSale(order, vm),
+                      icon: _isConverting
+                          ? const SizedBox(
+                              height: AppSizes.iconSm,
+                              width: AppSizes.iconSm,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(
+                              Icons.point_of_sale_outlined,
+                              size: AppSizes.iconSm,
+                            ),
+                      label: const Text('Convert to Sale'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.sm,
+                          vertical: AppSizes.xs,
+                        ),
+                        minimumSize: const Size(80, 32),
+                      ),
                     ),
-                  ),
                 ],
               ],
             ),

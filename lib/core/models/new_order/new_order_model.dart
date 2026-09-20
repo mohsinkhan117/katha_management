@@ -1,4 +1,4 @@
-// lib\core\models\new_order\new_order_model.dart
+// lib/core/models/new_order/new_order_model.dart
 
 import 'package:katha_management/core/models/new_order/new_order_item_model.dart';
 import 'package:uuid/uuid.dart';
@@ -70,6 +70,12 @@ class OrderModel {
   final DateTime updatedAt;
   final bool isSynced;
 
+  /// Set once this order has produced a Sale via `convertToSale()`.
+  /// `null` means it hasn't been converted yet. This is the guard
+  /// that stops an order being converted to a sale more than once —
+  /// see `OrderViewModel.convertToSale`.
+  final String? convertedSaleId;
+
   OrderModel({
     String? id,
     this.partyId,
@@ -83,6 +89,7 @@ class OrderModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isSynced = false,
+    this.convertedSaleId,
   }) : id = id ?? const Uuid().v4(),
        orderDate = orderDate ?? DateTime.now(),
        createdAt = createdAt ?? DateTime.now(),
@@ -105,6 +112,7 @@ class OrderModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isSynced': isSynced ? 1 : 0,
+      'convertedSaleId': convertedSaleId,
     };
   }
 
@@ -129,6 +137,7 @@ class OrderModel {
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
       isSynced: (map['isSynced'] as int?) == 1,
+      convertedSaleId: map['convertedSaleId'] as String?,
     );
   }
 
@@ -142,6 +151,7 @@ class OrderModel {
     OrderStatus? status,
     String? note,
     bool? isSynced,
+    String? convertedSaleId,
   }) {
     return OrderModel(
       id: id,
@@ -156,6 +166,7 @@ class OrderModel {
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       isSynced: isSynced ?? this.isSynced,
+      convertedSaleId: convertedSaleId ?? this.convertedSaleId,
     );
   }
 }

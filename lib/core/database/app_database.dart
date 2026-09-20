@@ -3,12 +3,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
-/// Single sqflite entry point for the whole app.
-///
-/// Every feature's repository asks this class for the `Database`
-/// instance rather than opening its own connection. Table creation for
-/// new features is added here, guarded by a version bump in
-/// `_onUpgrade`, so the schema grows without breaking existing data.
 class AppDatabase {
   AppDatabase._internal();
 
@@ -16,16 +10,17 @@ class AppDatabase {
 
   static Database? _database;
 
-  // Bump this and add a branch in `_onUpgrade` whenever a table is
-  // added or changed (e.g. Party, Product, Payment modules).
+  // Increase this whenever the database structure changes.
   static const int _dbVersion = 1;
   static const String _dbName = 'katha_management.db';
 
+  // Returns the single database instance.
   Future<Database> get database async {
     _database ??= await _initDatabase();
     return _database!;
   }
 
+  // Opens or creates the database.
   Future<Database> _initDatabase() async {
     final dbDirectory = await getDatabasesPath();
     final path = join(dbDirectory, _dbName);
@@ -36,31 +31,44 @@ class AppDatabase {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onConfigure: (db) async {
-        // Enforce FK constraints (off by default on sqflite).
+        // Enable foreign key constraints.
         await db.execute('PRAGMA foreign_keys = ON');
       },
     );
   }
 
+  // Runs when the database is created for the first time.
   Future<void> _onCreate(Database db, int version) async {
     await _createPartiesTable(db);
     await _createSalesTables(db);
     await _createOrdersTables(db);
     await _createPaymentsTables(db);
-    // Future modules add their CREATE TABLE calls here, e.g.:
-    // await _createProductTable(db);
+
+    // Add new tables here for fresh installations.
   }
 
+  // Runs when an existing database is upgraded.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Example of how future schema changes should be layered in:
-    //
-    // if (oldVersion < 2) {
-    //   await _createProductTable(db);
-    // }
-    // if (oldVersion < 3) {
-    //   await db.execute('ALTER TABLE sales ADD COLUMN orderId TEXT');
-    // }
+    // Version 1 → Version 2
+    if (oldVersion < 2) {
+      // Example:
+      // await _createProductsTable(db);
+    }
+
+    // Version 2 → Version 3
+    if (oldVersion < 3) {
+      // Example:
+      // await db.execute(
+      //   'ALTER TABLE parties ADD COLUMN creditLimit REAL NOT NULL DEFAULT 0',
+      // );
+    }
+
+    // Add future migrations here.
   }
+
+  // ------------------------------------------------------------
+  // Parties
+  // ------------------------------------------------------------
 
   Future<void> _createPartiesTable(Database db) async {
     await db.execute('''
@@ -80,6 +88,10 @@ class AppDatabase {
 
     await db.execute('CREATE INDEX idx_parties_name ON parties (name)');
   }
+
+  // ------------------------------------------------------------
+  // Sales
+  // ------------------------------------------------------------
 
   Future<void> _createSalesTables(Database db) async {
     await db.execute('''
@@ -108,20 +120,28 @@ class AppDatabase {
         quantity REAL NOT NULL,
         unitPrice REAL NOT NULL,
         discount REAL NOT NULL DEFAULT 0,
-        FOREIGN KEY (saleId) REFERENCES sales (id) ON DELETE CASCADE
+        FOREIGN KEY (saleId)
+          REFERENCES sales (id)
+          ON DELETE CASCADE
       )
     ''');
 
     await db.execute(
       'CREATE INDEX idx_sale_items_saleId ON sale_items (saleId)',
     );
+
     await db.execute('CREATE INDEX idx_sales_partyId ON sales (partyId)');
   }
+
+  // ------------------------------------------------------------
+  // Orders
+  // ------------------------------------------------------------
 
   Future<void> _createOrdersTables(Database db) async {
     await db.execute('''
       CREATE TABLE orders (
         id TEXT PRIMARY KEY,
+        convertedSaleId TEXT,
         partyId TEXT,
         partyName TEXT NOT NULL,
         partyPhone TEXT,
@@ -145,16 +165,24 @@ class AppDatabase {
         quantity REAL NOT NULL,
         unitPrice REAL NOT NULL,
         discount REAL NOT NULL DEFAULT 0,
-        FOREIGN KEY (orderId) REFERENCES orders (id) ON DELETE CASCADE
+        FOREIGN KEY (orderId)
+          REFERENCES orders (id)
+          ON DELETE CASCADE
       )
     ''');
 
     await db.execute(
       'CREATE INDEX idx_order_items_orderId ON order_items (orderId)',
     );
+
     await db.execute('CREATE INDEX idx_orders_partyId ON orders (partyId)');
+
     await db.execute('CREATE INDEX idx_orders_status ON orders (status)');
   }
+
+  // ------------------------------------------------------------
+  // Payments
+  // ------------------------------------------------------------
 
   Future<void> _createPaymentsTables(Database db) async {
     await db.execute('''
@@ -173,30 +201,38 @@ class AppDatabase {
       )
     ''');
 
-    // Links a payment to the sale(s) it settles, in whole or in part.
-    // A payment with zero rows here is a pure on-account advance.
     await db.execute('''
       CREATE TABLE payment_allocations (
         id TEXT PRIMARY KEY,
         paymentId TEXT NOT NULL,
         saleId TEXT NOT NULL,
         amountApplied REAL NOT NULL,
-        FOREIGN KEY (paymentId) REFERENCES payments (id) ON DELETE CASCADE,
-        FOREIGN KEY (saleId) REFERENCES sales (id) ON DELETE CASCADE
+        FOREIGN KEY (paymentId)
+          REFERENCES payments (id)
+          ON DELETE CASCADE,
+        FOREIGN KEY (saleId)
+          REFERENCES sales (id)
+          ON DELETE CASCADE
       )
     ''');
 
     await db.execute('CREATE INDEX idx_payments_partyId ON payments (partyId)');
+
     await db.execute(
-      'CREATE INDEX idx_payment_allocations_paymentId ON payment_allocations (paymentId)',
+      'CREATE INDEX idx_payment_allocations_paymentId '
+      'ON payment_allocations (paymentId)',
     );
+
     await db.execute(
-      'CREATE INDEX idx_payment_allocations_saleId ON payment_allocations (saleId)',
+      'CREATE INDEX idx_payment_allocations_saleId '
+      'ON payment_allocations (saleId)',
     );
   }
 
+  // Closes the database connection.
   Future<void> close() async {
     final db = _database;
+
     if (db != null) {
       await db.close();
       _database = null;
