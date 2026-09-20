@@ -27,7 +27,11 @@ class _NavigationBarViewState extends State<NavigationBarView> {
 
   void _onTabTapped(int index) {
     if (index == 3) {
-      Navigator.pushNamed(context, AddPartyView.routeName);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AddPartyView.routeName,
+        (route) => false,
+      );
       return;
     }
     setState(() => _selectedIndex = index);

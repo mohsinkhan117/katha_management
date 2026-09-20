@@ -5,7 +5,7 @@ import 'package:katha_management/ui/customers/customers_view.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
-import 'package:katha_management/ui/navigation_bar/navigattion_bar_view.dart';
+import 'package:katha_management/ui/navigation_bar/gnav_bar_view.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
 import 'package:katha_management/ui/orders/orders_view.dart';
@@ -19,8 +19,10 @@ class RouterGenerator {
       // ======================================================
       // Core
       // ======================================================
-      case NavigationBarView.routeName:
-        return NavigationBarView.route();
+      case GnavBar.routeName:
+        return GnavBar.route();
+      // case NavigationBarView.routeName:
+      //   return NavigationBarView.route();
 
       case DashboardView.routeName:
         return DashboardView.route();
