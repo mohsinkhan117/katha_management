@@ -88,12 +88,12 @@ class _NavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        boxShadow: [
-          BoxShadow(blurRadius: 20, color: Colors.black.withValues(alpha: 0.1)),
-        ],
-      ),
+      // decoration: BoxDecoration(
+      //   color: AppColors.accent,
+      //   boxShadow: [
+      //     BoxShadow(blurRadius: 20, color: Colors.black.withValues(alpha: 0.1)),
+      //   ],
+      // ),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),

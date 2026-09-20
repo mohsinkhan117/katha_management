@@ -71,16 +71,6 @@ class _HomeViewBody extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.pushNamed(context, NewSaleView.routeName);
-          if (context.mounted) {
-            context.read<DashboardViewmodel>().refresh();
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Sale'),
-      ),
     );
   }
 }
@@ -122,45 +112,62 @@ class _ErrorBanner extends StatelessWidget {
 
 class _SummaryCards extends StatelessWidget {
   const _SummaryCards({required this.vm});
+
   final DashboardViewmodel vm;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _SummaryCard(
-            label: "Today's Sales",
-            amount: vm.todaySales,
-            icon: Icons.trending_up_rounded,
-            color: AppColors.primary,
+    return SizedBox(
+      height: 180,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 2,
+            child: _SummaryLargeCard(
+              label: "Today's Sales",
+              amount: vm.todaySales,
+              icon: Icons.trending_up_rounded,
+              color: AppColors.primary,
+            ),
           ),
-        ),
-        const SizedBox(width: AppSizes.sm),
-        Expanded(
-          child: _SummaryCard(
-            label: "Today's Collection",
-            amount: vm.todayCollection,
-            icon: Icons.savings_outlined,
-            color: AppColors.success,
+
+          const SizedBox(width: AppSizes.sm),
+
+          Expanded(
+            flex: 1,
+            child: Column(
+              children: [
+                Expanded(
+                  child: _SummarySmallCard(
+                    label: "Today's Collection",
+                    amount: vm.todayCollection,
+                    icon: Icons.savings_outlined,
+                    color: AppColors.success,
+                  ),
+                ),
+
+                const SizedBox(height: AppSizes.sm),
+
+                Expanded(
+                  child: _SummarySmallCard(
+                    label: 'Receivables',
+                    amount: vm.totalReceivables,
+                    icon: Icons.account_balance_wallet_outlined,
+                    color: AppColors.tetraColor,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: AppSizes.sm),
-        Expanded(
-          child: _SummaryCard(
-            label: 'Receivables',
-            amount: vm.totalReceivables,
-            icon: Icons.account_balance_wallet_outlined,
-            color: AppColors.tetraColor,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _SummaryLargeCard extends StatelessWidget {
+  const _SummaryLargeCard({
     required this.label,
     required this.amount,
     required this.icon,
@@ -173,43 +180,128 @@ class _SummaryCard extends StatelessWidget {
   final Color color;
 
   String _formatAmount(double value) {
-    if (value >= 100000) return '${(value / 100000).toStringAsFixed(1)}L';
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
+    if (value >= 100000) {
+      return '${(value / 100000).toStringAsFixed(1)}L';
+    }
+
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}K';
+    }
+
     return value.toStringAsFixed(0);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: AppSizes.cardElevation,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSizes.cardRadiusMd),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.sm),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSizes.borderRadiusLg),
+        color: color.withValues(alpha: 0.3),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: AppSizes.iconMd),
-            const SizedBox(height: AppSizes.sm),
-            Text(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: AppSizes.iconMd),
+
+          const SizedBox(height: AppSizes.sm),
+
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
               'Rs ${_formatAmount(amount)}',
-              style: const TextStyle(
+              style: TextStyle(
+                fontSize: AppSizes.fontSizeLg + 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: AppSizes.md),
+
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: AppSizes.fontSizeMd, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummarySmallCard extends StatelessWidget {
+  const _SummarySmallCard({
+    required this.label,
+    required this.amount,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final double amount;
+  final IconData icon;
+  final Color color;
+
+  String _formatAmount(double value) {
+    if (value >= 100000) {
+      return '${(value / 100000).toStringAsFixed(1)}L';
+    }
+
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}K';
+    }
+
+    return value.toStringAsFixed(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.sm,
+        vertical: AppSizes.xs,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSizes.borderRadiusLg),
+        color: color.withValues(alpha: 0.3),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: AppSizes.iconMd),
+
+          const SizedBox(height: AppSizes.xs),
+
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Rs ${_formatAmount(amount)}',
+              style: TextStyle(
                 fontSize: AppSizes.fontSizeMd,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: color,
               ),
             ),
-            const SizedBox(height: AppSizes.xs),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: AppSizes.fontSizeSm,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 2),
+
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: AppSizes.fontSizeSm, color: color),
+          ),
+        ],
       ),
     );
   }
@@ -373,71 +465,65 @@ class _PendingPartyTile extends StatelessWidget {
     final days = party.daysSinceOldestDue;
     final isOverdue = days != null && days > 7;
 
-    return Card(
-      elevation: AppSizes.cardElevation,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+    return ListTile(
+      onTap: () async {
+        await Navigator.pushNamed(
+          context,
+          PartyHistoryView.routeName,
+          arguments: party.partyId,
+        );
+        if (context.mounted) {
+          context.read<DashboardViewmodel>().refresh();
+        }
+      },
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.sm,
+        vertical: AppSizes.xs,
       ),
-      child: ListTile(
-        onTap: () async {
-          await Navigator.pushNamed(
-            context,
-            PartyHistoryView.routeName,
-            arguments: party.partyId,
-          );
-          if (context.mounted) {
-            context.read<DashboardViewmodel>().refresh();
-          }
-        },
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.sm,
-          vertical: AppSizes.xs,
+      leading: CircleAvatar(
+        backgroundColor: AppColors.lightContainer,
+        child: Text(
+          party.partyName.isNotEmpty ? party.partyName[0] : '?',
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.lightContainer,
-          child: Text(
-            party.partyName.isNotEmpty ? party.partyName[0] : '?',
+      ),
+      title: Text(
+        party.partyName,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      subtitle: Text(
+        party.partyPhone ?? 'No phone on file',
+        style: const TextStyle(
+          fontSize: AppSizes.fontSizeSm,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            'Rs ${party.balanceDue.toStringAsFixed(0)}',
             style: const TextStyle(
-              color: AppColors.primary,
               fontWeight: FontWeight.bold,
+              color: AppColors.tetraColor,
             ),
           ),
-        ),
-        title: Text(
-          party.partyName,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          party.partyPhone ?? 'No phone on file',
-          style: const TextStyle(
-            fontSize: AppSizes.fontSizeSm,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              'Rs ${party.balanceDue.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.tetraColor,
-              ),
+          const SizedBox(height: AppSizes.xs),
+          Text(
+            days != null ? '${days}d overdue' : 'Opening balance',
+            style: TextStyle(
+              fontSize: AppSizes.fontSizeSm,
+              color: isOverdue ? AppColors.error : AppColors.warning,
             ),
-            const SizedBox(height: AppSizes.xs),
-            Text(
-              days != null ? '${days}d overdue' : 'Opening balance',
-              style: TextStyle(
-                fontSize: AppSizes.fontSizeSm,
-                color: isOverdue ? AppColors.error : AppColors.warning,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
