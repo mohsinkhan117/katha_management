@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
+import 'package:katha_management/ui/products/product_list_view.dart';
 import 'package:provider/provider.dart';
 
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
@@ -54,6 +55,7 @@ class _GnavBarBodyState extends State<_GnavBarBody> {
     (_) => const DashboardView(),
     (_) => const OrdersView(),
     (_) => const CustomersView(),
+    (_) => const ProductListView(),
   ];
 
   @override
@@ -113,6 +115,7 @@ class _NavBar extends StatelessWidget {
               GButton(icon: Icons.dashboard, text: 'Dashboard'),
               GButton(icon: Icons.receipt, text: 'Orders'),
               GButton(icon: Icons.people, text: 'Customers'),
+              GButton(icon: Icons.production_quantity_limits, text: 'Products'),
             ],
           ),
         ),
