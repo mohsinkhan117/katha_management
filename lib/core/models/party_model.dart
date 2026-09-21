@@ -59,6 +59,14 @@ class PartyModel {
   final DateTime updatedAt;
   final bool isSynced;
 
+  // add the following extra more details 
+  /*
+  List<String> PhoneNumbers; // incase of more than a single phone number
+  List<Order> orders; // I want to get all the orders, there complete stats(deliveryTime,status, paymentStatus, times, I mean All details of orders)
+
+  also in view I want to show complete stats of company paymentsRecieved/ advance(Opening balance)/ remainingDues, promised dates of orders to be paid within
+   */
+
   PartyModel({
     String? id,
     required this.name,
