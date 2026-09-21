@@ -10,8 +10,10 @@ class AppDatabase {
 
   static Database? _database;
 
-  // Increase this whenever the database structure changes.
-  static const int _dbVersion = 1;
+  // Version 2:
+  // Added products and product_sizes tables.
+  static const int _dbVersion = 2;
+
   static const String _dbName = 'katha_management.db';
 
   // Returns the single database instance.
@@ -43,27 +45,30 @@ class AppDatabase {
     await _createSalesTables(db);
     await _createOrdersTables(db);
     await _createPaymentsTables(db);
-
-    // Add new tables here for fresh installations.
+    await _createProductsTables(db);
   }
 
   // Runs when an existing database is upgraded.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // ------------------------------------------------------------
     // Version 1 → Version 2
+    // ------------------------------------------------------------
     if (oldVersion < 2) {
-      // Example:
-      // await _createProductsTable(db);
+      // Add the product catalog.
+      await _createProductsTables(db);
     }
 
-    // Version 2 → Version 3
+    // ------------------------------------------------------------
+    // Future Version 2 → Version 3
+    // ------------------------------------------------------------
+    /*
     if (oldVersion < 3) {
-      // Example:
-      // await db.execute(
-      //   'ALTER TABLE parties ADD COLUMN creditLimit REAL NOT NULL DEFAULT 0',
-      // );
+      await db.execute(
+        'ALTER TABLE parties '
+        'ADD COLUMN creditLimit REAL NOT NULL DEFAULT 0',
+      );
     }
-
-    // Add future migrations here.
+    */
   }
 
   // ------------------------------------------------------------
@@ -86,7 +91,10 @@ class AppDatabase {
       )
     ''');
 
-    await db.execute('CREATE INDEX idx_parties_name ON parties (name)');
+    await db.execute(
+      'CREATE INDEX idx_parties_name '
+      'ON parties (name)',
+    );
   }
 
   // ------------------------------------------------------------
@@ -120,6 +128,7 @@ class AppDatabase {
         quantity REAL NOT NULL,
         unitPrice REAL NOT NULL,
         discount REAL NOT NULL DEFAULT 0,
+
         FOREIGN KEY (saleId)
           REFERENCES sales (id)
           ON DELETE CASCADE
@@ -127,10 +136,14 @@ class AppDatabase {
     ''');
 
     await db.execute(
-      'CREATE INDEX idx_sale_items_saleId ON sale_items (saleId)',
+      'CREATE INDEX idx_sale_items_saleId '
+      'ON sale_items (saleId)',
     );
 
-    await db.execute('CREATE INDEX idx_sales_partyId ON sales (partyId)');
+    await db.execute(
+      'CREATE INDEX idx_sales_partyId '
+      'ON sales (partyId)',
+    );
   }
 
   // ------------------------------------------------------------
@@ -165,6 +178,7 @@ class AppDatabase {
         quantity REAL NOT NULL,
         unitPrice REAL NOT NULL,
         discount REAL NOT NULL DEFAULT 0,
+
         FOREIGN KEY (orderId)
           REFERENCES orders (id)
           ON DELETE CASCADE
@@ -172,12 +186,19 @@ class AppDatabase {
     ''');
 
     await db.execute(
-      'CREATE INDEX idx_order_items_orderId ON order_items (orderId)',
+      'CREATE INDEX idx_order_items_orderId '
+      'ON order_items (orderId)',
     );
 
-    await db.execute('CREATE INDEX idx_orders_partyId ON orders (partyId)');
+    await db.execute(
+      'CREATE INDEX idx_orders_partyId '
+      'ON orders (partyId)',
+    );
 
-    await db.execute('CREATE INDEX idx_orders_status ON orders (status)');
+    await db.execute(
+      'CREATE INDEX idx_orders_status '
+      'ON orders (status)',
+    );
   }
 
   // ------------------------------------------------------------
@@ -207,16 +228,21 @@ class AppDatabase {
         paymentId TEXT NOT NULL,
         saleId TEXT NOT NULL,
         amountApplied REAL NOT NULL,
+
         FOREIGN KEY (paymentId)
           REFERENCES payments (id)
           ON DELETE CASCADE,
+
         FOREIGN KEY (saleId)
           REFERENCES sales (id)
           ON DELETE CASCADE
       )
     ''');
 
-    await db.execute('CREATE INDEX idx_payments_partyId ON payments (partyId)');
+    await db.execute(
+      'CREATE INDEX idx_payments_partyId '
+      'ON payments (partyId)',
+    );
 
     await db.execute(
       'CREATE INDEX idx_payment_allocations_paymentId '
@@ -229,7 +255,102 @@ class AppDatabase {
     );
   }
 
-  // Closes the database connection.
+  // ------------------------------------------------------------
+  // Products
+  // Version 2
+  // ------------------------------------------------------------
+
+  Future<void> _createProductsTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+
+        name TEXT NOT NULL,
+        description TEXT,
+        imageUrl TEXT,
+
+        sku TEXT,
+        category TEXT,
+        unit TEXT,
+
+        retailPrice REAL NOT NULL DEFAULT 0,
+        discountPrice REAL,
+        costPrice REAL,
+
+        stockQuantity INTEGER NOT NULL DEFAULT 0,
+
+        status TEXT NOT NULL DEFAULT 'inStock',
+        isActive INTEGER NOT NULL DEFAULT 1,
+
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+
+        isSynced INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    // Different sizes / variants of a product.
+    //
+    // Example:
+    // Product = Cooking Oil
+    //
+    // Sizes:
+    // 1 Liter  -> Rs. 550
+    // 3 Liter  -> Rs. 1550
+    // 5 Liter  -> Rs. 2500
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS product_sizes (
+        id TEXT PRIMARY KEY,
+
+        productId TEXT NOT NULL,
+
+        label TEXT NOT NULL,
+
+        price REAL NOT NULL,
+        discountPrice REAL,
+
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+
+        FOREIGN KEY (productId)
+          REFERENCES products (id)
+          ON DELETE CASCADE
+      )
+    ''');
+
+    // ------------------------------------------------------------
+    // Product Indexes
+    // ------------------------------------------------------------
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_products_name '
+      'ON products (name)',
+    );
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_products_category '
+      'ON products (category)',
+    );
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_products_sku '
+      'ON products (sku)',
+    );
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_products_status '
+      'ON products (status)',
+    );
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_product_sizes_productId '
+      'ON product_sizes (productId)',
+    );
+  }
+
+  // ------------------------------------------------------------
+  // Close Database
+  // ------------------------------------------------------------
+
   Future<void> close() async {
     final db = _database;
 
