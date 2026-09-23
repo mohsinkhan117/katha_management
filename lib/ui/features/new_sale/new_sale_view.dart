@@ -138,7 +138,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           ),
           const SizedBox(height: AppSizes.xs),
           const Text(
-            'Check items to add. Prices are mutable for discounts/special customers.',
+            'Check products to add. Select size variants from dropdown and customize prices if needed.',
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
               color: AppColors.textSecondary,
@@ -188,7 +188,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
             ),
           ] else ...[
             ...vm.filteredProducts.map((product) {
-              return _ProductSelectionCard(product: product);
+              return _ProductCardWithDropdown(product: product);
             }),
           ],
 
@@ -287,118 +287,27 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
   }
 }
 
-class _ProductSelectionCard extends StatelessWidget {
-  const _ProductSelectionCard({required this.product});
+class _ProductCardWithDropdown extends StatefulWidget {
+  const _ProductCardWithDropdown({required this.product});
   final ProductModel product;
 
   @override
-  Widget build(BuildContext context) {
-    final hasSizes = product.hasSizes;
-
-    return Card(
-      elevation: AppSizes.cardElevation,
-      margin: const EdgeInsets.only(bottom: AppSizes.sm),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product Header Row
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: AppSizes.fontSizeMd,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      if (product.category != null &&
-                          product.category!.isNotEmpty)
-                        Text(
-                          product.category!,
-                          style: const TextStyle(
-                            fontSize: AppSizes.fontSizeSm,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                if (!hasSizes)
-                  Text(
-                    'Default: Rs ${product.finalPrice.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontSizeSm,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-              ],
-            ),
-
-            const Divider(height: 16),
-
-            // If product has no sizes -> Single product checkbox toggle row
-            if (!hasSizes) ...[
-              _ProductVariantRow(
-                product: product,
-                size: null,
-                label: 'Standard (${product.unit ?? "Unit"})',
-                defaultPrice: product.finalPrice,
-              ),
-            ] else ...[
-              // If product has size variants -> Render each size variant toggle
-              ...product.sizes.map((size) {
-                return _ProductVariantRow(
-                  product: product,
-                  size: size,
-                  label: size.label,
-                  defaultPrice: size.finalPrice,
-                );
-              }),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  State<_ProductCardWithDropdown> createState() =>
+      _ProductCardWithDropdownState();
 }
 
-class _ProductVariantRow extends StatefulWidget {
-  const _ProductVariantRow({
-    required this.product,
-    required this.size,
-    required this.label,
-    required this.defaultPrice,
-  });
-
-  final ProductModel product;
-  final ProductSizeModel? size;
-  final String label;
-  final double defaultPrice;
-
-  @override
-  State<_ProductVariantRow> createState() => _ProductVariantRowState();
-}
-
-class _ProductVariantRowState extends State<_ProductVariantRow> {
+class _ProductCardWithDropdownState extends State<_ProductCardWithDropdown> {
   late final TextEditingController _priceController;
   late final TextEditingController _qtyController;
 
   @override
   void initState() {
     super.initState();
+    final defaultPrice = widget.product.hasSizes
+        ? widget.product.sizes.first.finalPrice
+        : widget.product.finalPrice;
     _priceController = TextEditingController(
-      text: widget.defaultPrice.toStringAsFixed(0),
+      text: defaultPrice.toStringAsFixed(0),
     );
     _qtyController = TextEditingController(text: '1');
   }
@@ -413,118 +322,178 @@ class _ProductVariantRowState extends State<_ProductVariantRow> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<NewSaleViewModel>();
-    final isSelected = vm.isVariantSelected(widget.product.id, widget.size?.id);
-    final variantState = vm.getVariantState(widget.product.id, widget.size?.id);
-    final key = NewSaleViewModel.getItemKey(widget.product.id, widget.size?.id);
+    final isSelected = vm.isProductSelected(widget.product.id);
+    final state = vm.getProductState(widget.product.id);
+    final hasSizes = widget.product.hasSizes;
 
-    if (variantState != null) {
-      if (_priceController.text != variantState.unitPrice.toStringAsFixed(0) &&
+    if (state != null) {
+      if (_priceController.text != state.unitPrice.toStringAsFixed(0) &&
           !_priceController.selection.isValid) {
-        _priceController.text = variantState.unitPrice.toStringAsFixed(0);
+        _priceController.text = state.unitPrice.toStringAsFixed(0);
       }
-      if (_qtyController.text != variantState.quantity.toStringAsFixed(0) &&
+      if (_qtyController.text != state.quantity.toStringAsFixed(0) &&
           !_qtyController.selection.isValid) {
-        _qtyController.text = variantState.quantity.toStringAsFixed(0);
+        _qtyController.text = state.quantity.toStringAsFixed(0);
       }
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? AppColors.primary.withValues(alpha: 0.04)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppSizes.borderRadiusSm),
-        border: isSelected
-            ? Border.all(color: AppColors.primary.withValues(alpha: 0.2))
-            : null,
+    return Card(
+      elevation: AppSizes.cardElevation,
+      margin: const EdgeInsets.only(bottom: AppSizes.sm),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+        side: isSelected
+            ? BorderSide(
+                color: AppColors.primary.withValues(alpha: 0.5),
+                width: 1.2,
+              )
+            : BorderSide.none,
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Checkbox(
-                value: isSelected,
-                activeColor: AppColors.primary,
-                onChanged: (checked) {
-                  vm.toggleProductVariant(
-                    widget.product,
-                    widget.size,
-                    checked ?? false,
-                  );
-                  if (checked == true) {
-                    _priceController.text = widget.defaultPrice.toStringAsFixed(
-                      0,
-                    );
-                    _qtyController.text = '1';
-                  }
-                },
-              ),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: TextStyle(
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    color: AppColors.textPrimary,
+      color: isSelected
+          ? AppColors.primary.withValues(alpha: 0.03)
+          : Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSizes.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product Title & Toggle Checkbox
+            Row(
+              children: [
+                Checkbox(
+                  value: isSelected,
+                  activeColor: AppColors.primary,
+                  onChanged: (checked) {
+                    vm.toggleProduct(widget.product, checked ?? false);
+                    if (checked == true) {
+                      final defaultPrice = widget.product.hasSizes
+                          ? widget.product.sizes.first.finalPrice
+                          : widget.product.finalPrice;
+                      _priceController.text = defaultPrice.toStringAsFixed(0);
+                      _qtyController.text = '1';
+                    }
+                  },
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.product.name,
+                        style: TextStyle(
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w600,
+                          fontSize: AppSizes.fontSizeMd,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (widget.product.category != null &&
+                          widget.product.category!.isNotEmpty)
+                        Text(
+                          widget.product.category!,
+                          style: const TextStyle(
+                            fontSize: AppSizes.fontSizeSm,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-              ),
-              if (!isSelected)
-                Text(
-                  'Rs ${widget.defaultPrice.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: AppSizes.fontSizeSm,
-                    color: AppColors.textSecondary,
+                if (!isSelected)
+                  Text(
+                    hasSizes
+                        ? 'from Rs ${widget.product.sizes.first.finalPrice.toStringAsFixed(0)}'
+                        : 'Rs ${widget.product.finalPrice.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: AppSizes.fontSizeSm,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-              if (isSelected && variantState != null)
-                Text(
-                  'Subtotal: Rs ${variantState.subtotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                if (isSelected && state != null)
+                  Text(
+                    'Rs ${state.subtotal.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: AppSizes.fontSizeMd,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            ),
 
-          // Mutable Price & Quantity row when checked
-          if (isSelected && variantState != null) ...[
-            Padding(
-              padding: const EdgeInsets.only(left: 36, right: 8, bottom: 6),
-              child: Row(
+            // Expanded Controls when product is selected
+            if (isSelected && state != null) ...[
+              const Divider(height: 12),
+
+              // ─── Size Variant Dropdown (if sizes available) ────────
+              if (hasSizes) ...[
+                const SizedBox(height: 4),
+                DropdownButtonFormField<ProductSizeModel>(
+                  decoration: const InputDecoration(
+                    labelText: 'Select Package Size',
+                    prefixIcon: Icon(Icons.inventory_2_outlined, size: 20),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    isDense: true,
+                  ),
+                  initialValue: widget.product.sizes.firstWhere(
+                    (s) => s.id == state.sizeId,
+                    orElse: () => widget.product.sizes.first,
+                  ),
+                  items: widget.product.sizes.map((size) {
+                    return DropdownMenuItem<ProductSizeModel>(
+                      value: size,
+                      child: Text(
+                        '${size.label}  —  Rs ${size.finalPrice.toStringAsFixed(0)}${size.hasDiscount ? ' (${size.discountPercentage.toStringAsFixed(0)}% off)' : ''}',
+                        style: const TextStyle(fontSize: AppSizes.fontSizeSm),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (newSize) {
+                    if (newSize != null) {
+                      vm.changeProductSize(widget.product, newSize);
+                      _priceController.text = newSize.finalPrice
+                          .toStringAsFixed(0);
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSizes.sm),
+              ],
+
+              // ─── Quantity and Mutable Price Row ─────────────────────
+              Row(
                 children: [
                   // Quantity Stepper
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, size: 20),
+                        icon: const Icon(Icons.remove_circle_outline, size: 22),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                         onPressed: () {
-                          final current = variantState.quantity;
+                          final current = state.quantity;
                           if (current > 1) {
-                            vm.updateVariantQuantity(key, current - 1);
+                            vm.updateProductQuantity(
+                              widget.product.id,
+                              current - 1,
+                            );
                             _qtyController.text = (current - 1).toStringAsFixed(
                               0,
                             );
                           } else {
-                            vm.toggleProductVariant(
-                              widget.product,
-                              widget.size,
-                              false,
-                            );
+                            vm.toggleProduct(widget.product, false);
                           }
                         },
                       ),
                       const SizedBox(width: 6),
                       SizedBox(
-                        width: 44,
-                        height: 36,
+                        width: 48,
+                        height: 38,
                         child: TextField(
                           controller: _qtyController,
                           textAlign: TextAlign.center,
@@ -537,18 +506,21 @@ class _ProductVariantRowState extends State<_ProductVariantRow> {
                           ),
                           onChanged: (val) {
                             final q = double.tryParse(val) ?? 1.0;
-                            vm.updateVariantQuantity(key, q);
+                            vm.updateProductQuantity(widget.product.id, q);
                           },
                         ),
                       ),
                       const SizedBox(width: 6),
                       IconButton(
-                        icon: const Icon(Icons.add_circle_outline, size: 20),
+                        icon: const Icon(Icons.add_circle_outline, size: 22),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                         onPressed: () {
-                          final current = variantState.quantity;
-                          vm.updateVariantQuantity(key, current + 1);
+                          final current = state.quantity;
+                          vm.updateProductQuantity(
+                            widget.product.id,
+                            current + 1,
+                          );
                           _qtyController.text = (current + 1).toStringAsFixed(
                             0,
                           );
@@ -562,7 +534,7 @@ class _ProductVariantRowState extends State<_ProductVariantRow> {
                   // Mutable Price Field
                   Expanded(
                     child: SizedBox(
-                      height: 38,
+                      height: 40,
                       child: TextField(
                         controller: _priceController,
                         keyboardType: const TextInputType.numberWithOptions(
@@ -576,23 +548,23 @@ class _ProductVariantRowState extends State<_ProductVariantRow> {
                             vertical: 8,
                           ),
                           isDense: true,
-                          helperText:
-                              variantState.unitPrice != widget.defaultPrice
-                              ? 'Default: Rs ${widget.defaultPrice.toStringAsFixed(0)}'
+                          helperText: state.unitPrice != state.defaultPrice
+                              ? 'Default: Rs ${state.defaultPrice.toStringAsFixed(0)}'
                               : null,
                         ),
                         onChanged: (val) {
                           final p = double.tryParse(val) ?? 0.0;
-                          vm.updateVariantPrice(key, p);
+                          vm.updateProductPrice(widget.product.id, p);
                         },
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 4),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

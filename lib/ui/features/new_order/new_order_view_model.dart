@@ -14,7 +14,7 @@ import 'package:katha_management/features/product/data/repositories/product_repo
 import 'package:katha_management/features/product/data/repositories/sqflite_product_repository.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view_model.dart';
 
-/// Drives the New Order form with full product catalog, size variant selection,
+/// Drives the New Order form with full product catalog, size variant dropdowns,
 /// mutable prices for special customers, and strict party linking.
 class NewOrderViewModel extends ChangeNotifier {
   NewOrderViewModel({
@@ -47,7 +47,7 @@ class NewOrderViewModel extends ChangeNotifier {
   bool isLoadingProducts = false;
   String productSearchQuery = '';
 
-  // ─── Selected Items Map (Key: '${productId}_${sizeId ?? "base"}') ──
+  // ─── Selected Items Map (Key: productId) ───────────────────────────
   final Map<String, SelectedProductState> _selectedItems = {};
   Map<String, SelectedProductState> get selectedItems => _selectedItems;
 
@@ -161,50 +161,61 @@ class NewOrderViewModel extends ChangeNotifier {
 
   // ─── Product Selection & Mutable Pricing Methods ───────────────────
 
-  static String getItemKey(String productId, String? sizeId) {
-    return '${productId}_${sizeId ?? "base"}';
+  bool isProductSelected(String productId) {
+    return _selectedItems.containsKey(productId);
   }
 
-  bool isVariantSelected(String productId, String? sizeId) {
-    final key = getItemKey(productId, sizeId);
-    return _selectedItems.containsKey(key);
+  SelectedProductState? getProductState(String productId) {
+    return _selectedItems[productId];
   }
 
-  SelectedProductState? getVariantState(String productId, String? sizeId) {
-    final key = getItemKey(productId, sizeId);
-    return _selectedItems[key];
-  }
-
-  void toggleProductVariant(
-    ProductModel product,
-    ProductSizeModel? size,
-    bool isSelected,
-  ) {
-    final key = getItemKey(product.id, size?.id);
+  /// Toggles product on/off. When checked, defaults to the FIRST available size.
+  void toggleProduct(ProductModel product, bool isSelected) {
     if (isSelected) {
-      final defaultPrice = size?.finalPrice ?? product.finalPrice;
-      _selectedItems[key] = SelectedProductState(
-        key: key,
+      final defaultSize = product.hasSizes ? product.sizes.first : null;
+      final defaultPrice = defaultSize?.finalPrice ?? product.finalPrice;
+
+      _selectedItems[product.id] = SelectedProductState(
+        key: product.id,
         productId: product.id,
-        sizeId: size?.id,
+        sizeId: defaultSize?.id,
         productName: product.name,
-        sizeLabel: size?.label,
+        sizeLabel: defaultSize?.label,
         defaultPrice: defaultPrice,
-        unitPrice: defaultPrice, // Mutable price starts at default
+        unitPrice: defaultPrice, // Defaults to size's finalPrice, editable
         quantity: 1.0,
         discount: 0.0,
       );
     } else {
-      _selectedItems.remove(key);
+      _selectedItems.remove(product.id);
     }
     notifyListeners();
   }
 
-  void updateVariantQuantity(String key, double qty) {
-    final item = _selectedItems[key];
+  /// Changes the selected size variant from the dropdown for a product.
+  void changeProductSize(ProductModel product, ProductSizeModel newSize) {
+    final item = _selectedItems[product.id];
+    if (item != null) {
+      _selectedItems[product.id] = SelectedProductState(
+        key: product.id,
+        productId: product.id,
+        sizeId: newSize.id,
+        productName: product.name,
+        sizeLabel: newSize.label,
+        defaultPrice: newSize.finalPrice,
+        unitPrice: newSize.finalPrice, // Updates price to newly selected size
+        quantity: item.quantity,
+        discount: item.discount,
+      );
+      notifyListeners();
+    }
+  }
+
+  void updateProductQuantity(String productId, double qty) {
+    final item = _selectedItems[productId];
     if (item != null) {
       if (qty <= 0) {
-        _selectedItems.remove(key);
+        _selectedItems.remove(productId);
       } else {
         item.quantity = qty;
       }
@@ -212,16 +223,16 @@ class NewOrderViewModel extends ChangeNotifier {
     }
   }
 
-  void updateVariantPrice(String key, double price) {
-    final item = _selectedItems[key];
+  void updateProductPrice(String productId, double price) {
+    final item = _selectedItems[productId];
     if (item != null) {
       item.unitPrice = price >= 0 ? price : 0;
       notifyListeners();
     }
   }
 
-  void updateVariantDiscount(String key, double discount) {
-    final item = _selectedItems[key];
+  void updateProductDiscount(String productId, double discount) {
+    final item = _selectedItems[productId];
     if (item != null) {
       item.discount = discount >= 0 ? discount : 0;
       notifyListeners();

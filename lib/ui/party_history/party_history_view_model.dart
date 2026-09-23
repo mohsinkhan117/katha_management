@@ -1,6 +1,13 @@
 // lib/ui/party_history/party_history_view_model.dart
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/models/new_order/new_order_model.dart';
+import 'package:katha_management/core/models/party_balance_summary.dart';
+import 'package:katha_management/core/models/party_model.dart';
+import 'package:katha_management/core/models/payment/payment_model.dart';
+import 'package:katha_management/core/models/sale_model.dart';
+import 'package:katha_management/core/services/party_balance_service.dart';
+import 'package:katha_management/core/services/party_report_pdf_service.dart';
 import 'package:katha_management/features/order/data/repositories/order_repository.dart';
 import 'package:katha_management/features/order/data/repositories/sqflite_order_repository.dart';
 import 'package:katha_management/features/party/data/repositories/party_repository.dart';
@@ -9,28 +16,24 @@ import 'package:katha_management/features/payment/data/repositories/payment_repo
 import 'package:katha_management/features/payment/data/repositories/sqflite_payment_repository.dart';
 import 'package:katha_management/features/sale/data/repositories/sale_repository.dart';
 import 'package:katha_management/features/sale/data/repositories/sqflite_sale_repository.dart';
-
-import '../../core/models/new_order/new_order_model.dart'; // ASSUMPTION: adjust to your real OrderModel path
-import '../../core/models/party_balance_summary.dart';
-import '../../core/models/party_model.dart';
-import '../../core/models/payment/payment_model.dart';
-import '../../core/models/sale_model.dart';
-import '../../core/services/party_balance_service.dart';
+import 'package:katha_management/features/settings/data/repositories/settings_repository.dart';
+import 'package:katha_management/features/settings/data/repositories/sqflite_settings_repository.dart';
 
 enum PartyHistoryFilter { all, sales, orders, payments }
 
 enum PartyHistoryEntryType { sale, order, payment }
 
-/// One row in the Party History timeline — a display-only wrapper
-/// around a Sale, Order, or Payment so all three can be merged, sorted,
-/// and rendered together without the View needing to know the shape
-/// of three different models.
+/// One row in the Party History timeline — holds full model details so
+/// expandable dropdowns can render line items, sizes, status, and notes.
 class PartyHistoryEntry {
   final PartyHistoryEntryType type;
   final double amount;
   final DateTime date;
   final String title;
   final String? subtitle;
+  final OrderModel? order;
+  final SaleModel? sale;
+  final PaymentModel? payment;
 
   const PartyHistoryEntry({
     required this.type,
@@ -38,12 +41,14 @@ class PartyHistoryEntry {
     required this.date,
     required this.title,
     this.subtitle,
+    this.order,
+    this.sale,
+    this.payment,
   });
 }
 
 /// Feeds the Party History screen: one party's full record across
-/// Sales, Orders, and Payments, plus their live balance — this is the
-/// screen that was missing entirely before.
+/// Sales, Orders, and Payments, plus their live balance and itemised breakdowns.
 class PartyHistoryViewModel extends ChangeNotifier {
   PartyHistoryViewModel({
     required this.partyId,
@@ -51,11 +56,13 @@ class PartyHistoryViewModel extends ChangeNotifier {
     SaleRepository? saleRepository,
     OrderRepository? orderRepository,
     PaymentRepository? paymentRepository,
+    SettingsRepository? settingsRepository,
     PartyBalanceService? balanceService,
   }) : _partyRepository = partyRepository ?? SqflitePartyRepository(),
        _saleRepository = saleRepository ?? SqfliteSaleRepository(),
        _orderRepository = orderRepository ?? SqfliteOrderRepository(),
        _paymentRepository = paymentRepository ?? SqflitePaymentRepository(),
+       _settingsRepository = settingsRepository ?? SqfliteSettingsRepository(),
        _balanceService = balanceService ?? PartyBalanceService() {
     load();
   }
@@ -65,9 +72,11 @@ class PartyHistoryViewModel extends ChangeNotifier {
   final SaleRepository _saleRepository;
   final OrderRepository _orderRepository;
   final PaymentRepository _paymentRepository;
+  final SettingsRepository _settingsRepository;
   final PartyBalanceService _balanceService;
 
   bool isLoading = false;
+  bool isGeneratingPdf = false;
   String? errorMessage;
 
   PartyModel? party;
@@ -78,6 +87,17 @@ class PartyHistoryViewModel extends ChangeNotifier {
   List<PaymentModel> payments = [];
 
   PartyHistoryFilter filter = PartyHistoryFilter.all;
+
+  // ─── Summary Statistics ─────────────────────────────────────────────
+  double get totalSalesAmount =>
+      sales.fold(0.0, (sum, s) => sum + s.totalAmount);
+  double get totalPaymentsAmount =>
+      payments.fold(0.0, (sum, p) => sum + p.amount);
+  int get totalOrdersCount => orders.length;
+  int get pendingOrdersCount =>
+      orders.where((o) => o.status != OrderStatus.delivered).length;
+  int get deliveredOrdersCount =>
+      orders.where((o) => o.status == OrderStatus.delivered).length;
 
   List<PartyHistoryEntry> get timeline {
     final entries = <PartyHistoryEntry>[
@@ -90,8 +110,9 @@ class PartyHistoryViewModel extends ChangeNotifier {
             date: sale.saleDate,
             title: 'Sale',
             subtitle: sale.balanceDue > 0
-                ? 'Rs ${sale.balanceDue.toStringAsFixed(0)} still due'
-                : 'Fully paid',
+                ? 'Rs ${sale.balanceDue.toStringAsFixed(0)} due'
+                : 'Paid',
+            sale: sale,
           ),
         ),
       if (filter == PartyHistoryFilter.all ||
@@ -102,6 +123,8 @@ class PartyHistoryViewModel extends ChangeNotifier {
             amount: order.totalAmount,
             date: order.orderDate,
             title: 'Order — ${order.status.label}',
+            subtitle: '${order.items.length} items',
+            order: order,
           ),
         ),
       if (filter == PartyHistoryFilter.all ||
@@ -111,8 +134,9 @@ class PartyHistoryViewModel extends ChangeNotifier {
             type: PartyHistoryEntryType.payment,
             amount: payment.amount,
             date: payment.paymentDate,
-            title: 'Payment received',
+            title: 'Payment (${payment.mode.label})',
             subtitle: payment.note,
+            payment: payment,
           ),
         ),
     ];
@@ -124,6 +148,62 @@ class PartyHistoryViewModel extends ChangeNotifier {
   void setFilter(PartyHistoryFilter value) {
     filter = value;
     notifyListeners();
+  }
+
+  Future<void> updateOrderStatus(String orderId, OrderStatus newStatus) async {
+    try {
+      await _orderRepository.updateOrderStatus(orderId, newStatus);
+      await load();
+    } catch (e) {
+      errorMessage = 'Failed to update order status: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<void> exportPdf() async {
+    if (party == null) return;
+    try {
+      isGeneratingPdf = true;
+      notifyListeners();
+
+      final profile = await _settingsRepository.getProfile();
+      await PartyReportPdfService.printOrPreview(
+        party: party!,
+        balance: balance,
+        orders: orders,
+        sales: sales,
+        payments: payments,
+        hotelProfile: profile,
+      );
+    } catch (e) {
+      errorMessage = 'Failed to export PDF: $e';
+    } finally {
+      isGeneratingPdf = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> sharePdf() async {
+    if (party == null) return;
+    try {
+      isGeneratingPdf = true;
+      notifyListeners();
+
+      final profile = await _settingsRepository.getProfile();
+      await PartyReportPdfService.sharePdf(
+        party: party!,
+        balance: balance,
+        orders: orders,
+        sales: sales,
+        payments: payments,
+        hotelProfile: profile,
+      );
+    } catch (e) {
+      errorMessage = 'Failed to share PDF: $e';
+    } finally {
+      isGeneratingPdf = false;
+      notifyListeners();
+    }
   }
 
   Future<void> load() async {
