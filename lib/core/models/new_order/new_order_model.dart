@@ -67,7 +67,9 @@ class OrderModel {
   final OrderStatus status;
   final String? note;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime updatedAt; 
+  // also add deliveredAt;
+  // payment status;  payment promised date
   final bool isSynced;
 
   /// Set once this order has produced a Sale via `convertToSale()`.

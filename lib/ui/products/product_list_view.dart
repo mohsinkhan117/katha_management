@@ -180,7 +180,10 @@ class _ProductTile extends StatelessWidget {
         subtitle: Text(
           product.hasSizes
               ? '${product.sizes.length} size${product.sizes.length == 1 ? '' : 's'}'
-              : 'Rs ${product.effectiveRetailPrice.toStringAsFixed(0)}',
+              : product.hasDiscount
+              ? 'Rs ${product.finalPrice.toStringAsFixed(0)} '
+                    '(${product.discountPercentage.toStringAsFixed(0)}% off Rs ${product.retailPrice.toStringAsFixed(0)})'
+              : 'Rs ${product.finalPrice.toStringAsFixed(0)}',
           style: const TextStyle(
             fontSize: AppSizes.fontSizeSm,
             color: AppColors.textSecondary,

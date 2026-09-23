@@ -10,9 +10,13 @@ class AppDatabase {
 
   static Database? _database;
 
-  // Version 2:
-  // Added products and product_sizes tables.
-  static const int _dbVersion = 2;
+  // Version 2: Added products and product_sizes tables.
+  // Version 3: Products/product_sizes switched from an absolute
+  //            `discountPrice` to `discountPercentage` + a stored
+  //            `finalPrice` (calculated once, at create/edit time).
+  // Version 4: Added costPrice to product_sizes table and created
+  //            hotel_profile table for business settings & hotel profile.
+  static const int _dbVersion = 4;
 
   static const String _dbName = 'katha_management.db';
 
@@ -46,6 +50,7 @@ class AppDatabase {
     await _createOrdersTables(db);
     await _createPaymentsTables(db);
     await _createProductsTables(db);
+    await _createSettingsTables(db);
   }
 
   // Runs when an existing database is upgraded.
@@ -59,16 +64,18 @@ class AppDatabase {
     }
 
     // ------------------------------------------------------------
-    // Future Version 2 → Version 3
+    // Version 2 → Version 3
     // ------------------------------------------------------------
-    /*
     if (oldVersion < 3) {
-      await db.execute(
-        'ALTER TABLE parties '
-        'ADD COLUMN creditLimit REAL NOT NULL DEFAULT 0',
-      );
+      await _migrateProductDiscountsToPercentage(db);
     }
-    */
+
+    // ------------------------------------------------------------
+    // Version 3 → Version 4
+    // ------------------------------------------------------------
+    if (oldVersion < 4) {
+      await _migrateToVersion4(db);
+    }
   }
 
   // ------------------------------------------------------------
@@ -257,7 +264,9 @@ class AppDatabase {
 
   // ------------------------------------------------------------
   // Products
-  // Version 2
+  // Version 3: discountPercentage + finalPrice (stored, computed
+  // once at create/edit time) replace the old absolute discountPrice.
+  // Version 4: costPrice column added to product_sizes.
   // ------------------------------------------------------------
 
   Future<void> _createProductsTables(Database db) async {
@@ -274,7 +283,8 @@ class AppDatabase {
         unit TEXT,
 
         retailPrice REAL NOT NULL DEFAULT 0,
-        discountPrice REAL,
+        discountPercentage REAL NOT NULL DEFAULT 0,
+        finalPrice REAL NOT NULL DEFAULT 0,
         costPrice REAL,
 
         stockQuantity INTEGER NOT NULL DEFAULT 0,
@@ -289,15 +299,6 @@ class AppDatabase {
       )
     ''');
 
-    // Different sizes / variants of a product.
-    //
-    // Example:
-    // Product = Cooking Oil
-    //
-    // Sizes:
-    // 1 Liter  -> Rs. 550
-    // 3 Liter  -> Rs. 1550
-    // 5 Liter  -> Rs. 2500
     await db.execute('''
       CREATE TABLE IF NOT EXISTS product_sizes (
         id TEXT PRIMARY KEY,
@@ -307,7 +308,9 @@ class AppDatabase {
         label TEXT NOT NULL,
 
         price REAL NOT NULL,
-        discountPrice REAL,
+        discountPercentage REAL NOT NULL DEFAULT 0,
+        finalPrice REAL NOT NULL DEFAULT 0,
+        costPrice REAL,
 
         sortOrder INTEGER NOT NULL DEFAULT 0,
 
@@ -317,10 +320,7 @@ class AppDatabase {
       )
     ''');
 
-    // ------------------------------------------------------------
     // Product Indexes
-    // ------------------------------------------------------------
-
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_products_name '
       'ON products (name)',
@@ -345,6 +345,109 @@ class AppDatabase {
       'CREATE INDEX IF NOT EXISTS idx_product_sizes_productId '
       'ON product_sizes (productId)',
     );
+  }
+
+  // ------------------------------------------------------------
+  // Settings & Hotel Profile
+  // ------------------------------------------------------------
+
+  Future<void> _createSettingsTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS hotel_profile (
+        id TEXT PRIMARY KEY,
+        hotelName TEXT NOT NULL,
+        tagline TEXT,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        ntnOrTaxNumber TEXT,
+        currencySymbol TEXT NOT NULL DEFAULT 'Rs',
+        invoiceFooterNote TEXT,
+        logoPath TEXT,
+        enableTax INTEGER NOT NULL DEFAULT 0,
+        taxPercentage REAL NOT NULL DEFAULT 0,
+        updatedAt TEXT NOT NULL
+      )
+    ''');
+  }
+
+  /// v3 → v4 data migration.
+  Future<void> _migrateToVersion4(Database db) async {
+    // 1. Create hotel_profile table if it doesn't exist.
+    await _createSettingsTables(db);
+
+    // 2. Add costPrice column to product_sizes if not present.
+    final sizeColumns = await db.rawQuery('PRAGMA table_info(product_sizes)');
+    final sizeColNames = sizeColumns.map((c) => c['name'] as String).toSet();
+    if (!sizeColNames.contains('costPrice')) {
+      await db.execute('ALTER TABLE product_sizes ADD COLUMN costPrice REAL');
+    }
+  }
+
+  /// v2 → v3 data migration.
+  Future<void> _migrateProductDiscountsToPercentage(Database db) async {
+    await _migrateDiscountColumns(
+      db,
+      table: 'products',
+      priceColumn: 'retailPrice',
+    );
+    await _migrateDiscountColumns(
+      db,
+      table: 'product_sizes',
+      priceColumn: 'price',
+    );
+  }
+
+  Future<void> _migrateDiscountColumns(
+    Database db, {
+    required String table,
+    required String priceColumn,
+  }) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    if (columns.isEmpty) return; // table doesn't exist on this device at all
+
+    final columnNames = columns.map((c) => c['name'] as String).toSet();
+    final hadOldDiscountPriceColumn = columnNames.contains('discountPrice');
+
+    if (!columnNames.contains('discountPercentage')) {
+      await db.execute(
+        'ALTER TABLE $table ADD COLUMN discountPercentage REAL NOT NULL DEFAULT 0',
+      );
+    }
+    if (!columnNames.contains('finalPrice')) {
+      await db.execute(
+        'ALTER TABLE $table ADD COLUMN finalPrice REAL NOT NULL DEFAULT 0',
+      );
+    }
+
+    if (hadOldDiscountPriceColumn) {
+      // Backfill from the old absolute discountPrice.
+      await db.execute('''
+        UPDATE $table
+        SET
+          discountPercentage = CASE
+            WHEN discountPrice IS NOT NULL
+                 AND discountPrice > 0
+                 AND discountPrice < $priceColumn
+                 AND $priceColumn > 0
+              THEN ROUND(((($priceColumn) - discountPrice) / ($priceColumn)) * 100, 2)
+            ELSE 0
+          END,
+          finalPrice = CASE
+            WHEN discountPrice IS NOT NULL
+                 AND discountPrice > 0
+                 AND discountPrice < $priceColumn
+              THEN discountPrice
+            ELSE $priceColumn
+          END
+      ''');
+    } else {
+      // No old discount data to carry over — just make sure
+      // finalPrice isn't left at its default 0 for existing rows.
+      await db.execute(
+        'UPDATE $table SET finalPrice = $priceColumn WHERE finalPrice = 0',
+      );
+    }
   }
 
   // ------------------------------------------------------------

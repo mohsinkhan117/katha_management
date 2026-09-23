@@ -7,10 +7,12 @@ import 'package:uuid/uuid.dart';
 /// Structurally identical to `SaleItemModel` by design — an Order is
 /// converted into a Sale/Invoice once delivered, so keeping the shape
 /// consistent makes that conversion a straight field copy later.
+/// 
+/// I think we don't need this model anymore bcs we will be using product model
 class OrderItemModel {
   final String id;
   final String orderId;
-  final String? productId;
+  final String? productId; 
   final String productName;
   final double quantity;
   final double unitPrice;

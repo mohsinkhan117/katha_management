@@ -1,15 +1,19 @@
 // lib/core/routes/routes_generator.dart
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/models/product/product_model.dart';
 import 'package:katha_management/ui/customers/customers_view.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view.dart';
+import 'package:katha_management/ui/features/add_product/add_product_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
 import 'package:katha_management/ui/navigation_bar/gnav_bar_view.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
 import 'package:katha_management/ui/orders/orders_view.dart';
 import 'package:katha_management/ui/party_history/party_history_view.dart';
+import 'package:katha_management/ui/products/product_list_view.dart';
+import 'package:katha_management/ui/settings_view/settings_view.dart';
 
 class RouterGenerator {
   static Route onGenerateRoute(RouteSettings settings) {
@@ -21,13 +25,9 @@ class RouterGenerator {
       // ======================================================
       case GnavBar.routeName:
         return GnavBar.route();
-      // case NavigationBarView.routeName:
-      //   return NavigationBarView.route();
 
       case DashboardView.routeName:
         return DashboardView.route();
-
-      //CustomersView
 
       case CustomersView.routeName:
         return CustomersView.route();
@@ -40,6 +40,9 @@ class RouterGenerator {
 
       case OrdersView.routeName:
         return OrdersView.route();
+
+      case ProductListView.routeName:
+        return ProductListView.route();
 
       case NewSaleView.routeName:
         final partyId = settings.arguments as String?;
@@ -55,6 +58,14 @@ class RouterGenerator {
 
       case AddPartyView.routeName:
         return AddPartyView.route();
+
+      case AddProductView.routeName:
+        final existingProduct = settings.arguments as ProductModel?;
+        return AddProductView.route(existingProduct: existingProduct);
+
+      case SettingsView.routeName:
+        return SettingsView.route();
+
       default:
         return _errorRoute();
     }

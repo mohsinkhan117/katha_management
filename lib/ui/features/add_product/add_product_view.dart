@@ -44,16 +44,13 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
   final _categoryController = TextEditingController();
   final _unitController = TextEditingController();
   final _retailPriceController = TextEditingController();
-  final _discountPriceController = TextEditingController();
+  final _discountPercentageController = TextEditingController();
   final _costPriceController = TextEditingController();
   final _stockQuantityController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill controllers from the ViewModel's initial state (which
-    // itself pre-filled from `existingProduct`, if any) — read once,
-    // outside of build, since these are one-time seed values.
     final vm = context.read<AddProductViewModel>();
     _nameController.text = vm.name;
     _descriptionController.text = vm.description;
@@ -63,13 +60,15 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
     _retailPriceController.text = vm.retailPrice > 0
         ? vm.retailPrice.toStringAsFixed(0)
         : '';
-    _discountPriceController.text = vm.discountPrice > 0
-        ? vm.discountPrice.toStringAsFixed(0)
+    _discountPercentageController.text = vm.discountPercentage > 0
+        ? vm.discountPercentage.toStringAsFixed(0)
         : '';
     _costPriceController.text = vm.costPrice > 0
         ? vm.costPrice.toStringAsFixed(0)
         : '';
-    _stockQuantityController.text = vm.stockQuantity?.toString() ?? '';
+    _stockQuantityController.text = vm.stockQuantity > 0
+        ? vm.stockQuantity.toString()
+        : '';
   }
 
   @override
@@ -80,7 +79,7 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
     _categoryController.dispose();
     _unitController.dispose();
     _retailPriceController.dispose();
-    _discountPriceController.dispose();
+    _discountPercentageController.dispose();
     _costPriceController.dispose();
     _stockQuantityController.dispose();
     super.dispose();
@@ -148,8 +147,19 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
             onChanged: (value) =>
                 context.read<AddProductViewModel>().setUnit(value),
           ),
+
           const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel('Pricing'),
+
+          // ─── Selling Price ──────────────────────────────────────
+          const _SectionLabel('Selling Price'),
+          const SizedBox(height: AppSizes.xs),
+          const Text(
+            'What the customer sees and pays.',
+            style: TextStyle(
+              fontSize: AppSizes.fontSizeSm,
+              color: AppColors.textSecondary,
+            ),
+          ),
           const SizedBox(height: AppSizes.sm),
           Row(
             children: [
@@ -161,6 +171,7 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                   ),
                   decoration: const InputDecoration(
                     labelText: 'Retail price *',
+                    prefixText: 'Rs ',
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
@@ -170,19 +181,41 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
               const SizedBox(width: AppSizes.sm),
               Expanded(
                 child: TextField(
-                  controller: _discountPriceController,
+                  controller: _discountPercentageController,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Discount price',
+                    labelText: 'Discount',
+                    suffixText: '%',
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
-                      .setDiscountPrice(double.tryParse(value) ?? 0),
+                      .setDiscountPercentage(double.tryParse(value) ?? 0),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppSizes.sm),
+          _FinalPriceCard(
+            retailPrice: vm.retailPrice,
+            discountAmount: vm.discountAmountPreview,
+            finalPrice: vm.finalPricePreview,
+            hasDiscount: vm.hasDiscountPreview,
+          ),
+
+          const SizedBox(height: AppSizes.spaceBtwSections),
+
+          // ─── Cost & Profit Margin ───────────────────────────────
+          const _SectionLabel('Cost & Profit Margin'),
+          const SizedBox(height: AppSizes.xs),
+          const Text(
+            'What this product costs you to buy or produce. Used only '
+            'to show your profit below — customers never see this.',
+            style: TextStyle(
+              fontSize: AppSizes.fontSizeSm,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: AppSizes.sm),
           Row(
@@ -195,7 +228,7 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                   ),
                   decoration: const InputDecoration(
                     labelText: 'Cost price',
-                    helperText: 'Used for margin reports later',
+                    prefixText: 'Rs ',
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
@@ -212,11 +245,17 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
-                      .setStockQuantity(int.tryParse(value)),
+                      .setStockQuantity(int.tryParse(value) ?? 0),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: AppSizes.sm),
+          _ProfitMarginCard(
+            profitMargin: vm.profitMarginPreview,
+            profitMarginPercentage: vm.profitMarginPercentagePreview,
+          ),
+
           const SizedBox(height: AppSizes.spaceBtwSections),
           const _SectionLabel('Status'),
           const SizedBox(height: AppSizes.sm),
@@ -313,6 +352,134 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
+/// Live readout of what the customer will actually be charged, shown
+/// right under the retail price / discount fields so the calculation
+/// is visible as the user types rather than only appearing after save.
+class _FinalPriceCard extends StatelessWidget {
+  const _FinalPriceCard({
+    required this.retailPrice,
+    required this.discountAmount,
+    required this.finalPrice,
+    required this.hasDiscount,
+  });
+
+  final double retailPrice;
+  final double discountAmount;
+  final double finalPrice;
+  final bool hasDiscount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.sm),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Customer Pays',
+            style: TextStyle(
+              fontSize: AppSizes.fontSizeMd,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Row(
+            children: [
+              if (hasDiscount) ...[
+                Text(
+                  'Rs ${retailPrice.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: AppSizes.fontSizeSm,
+                    color: AppColors.textSecondary,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+                const SizedBox(width: AppSizes.xs),
+              ],
+              Text(
+                'Rs ${finalPrice.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: AppSizes.fontSizeLg,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Live readout of profit per unit — replaces the old vague "used for
+/// margin later" helper text with an actual number, since a computed
+/// figure needs no further explanation.
+class _ProfitMarginCard extends StatelessWidget {
+  const _ProfitMarginCard({
+    required this.profitMargin,
+    required this.profitMarginPercentage,
+  });
+
+  final double? profitMargin;
+  final double? profitMarginPercentage;
+
+  @override
+  Widget build(BuildContext context) {
+    if (profitMargin == null) {
+      return Container(
+        padding: const EdgeInsets.all(AppSizes.sm),
+        decoration: BoxDecoration(
+          color: AppColors.lightContainer,
+          borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
+        ),
+        child: const Text(
+          'Enter a cost price to see your profit margin here.',
+          style: TextStyle(
+            fontSize: AppSizes.fontSizeSm,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    final isLoss = profitMargin! < 0;
+    final color = isLoss ? AppColors.error : AppColors.success;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.sm),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            isLoss ? 'Selling Below Cost' : 'Profit Margin',
+            style: TextStyle(fontSize: AppSizes.fontSizeMd, color: color),
+          ),
+          Text(
+            '${isLoss ? '-' : ''}Rs ${profitMargin!.abs().toStringAsFixed(0)} '
+            'per unit'
+            '${profitMarginPercentage != null ? ' (${profitMarginPercentage!.abs().toStringAsFixed(0)}%)' : ''}',
+            style: TextStyle(
+              fontSize: AppSizes.fontSizeMd,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StatusSelector extends StatelessWidget {
   const _StatusSelector({required this.selected});
   final ProductStatus selected;
@@ -360,6 +527,9 @@ class _SizesList extends StatelessWidget {
     return Column(
       children: List.generate(sizes.length, (index) {
         final size = sizes[index];
+        final margin = size.profitMargin;
+        final marginPct = size.profitMarginPercentage;
+
         return Card(
           elevation: AppSizes.cardElevation,
           margin: const EdgeInsets.only(bottom: AppSizes.sm),
@@ -378,14 +548,37 @@ class _SizesList extends StatelessWidget {
                 color: AppColors.textPrimary,
               ),
             ),
-            subtitle: Text(
-              size.discountPrice != null
-                  ? 'Rs ${size.price.toStringAsFixed(0)} \u2192 Rs ${size.discountPrice!.toStringAsFixed(0)}'
-                  : 'Rs ${size.price.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: AppSizes.fontSizeSm,
-                color: AppColors.textSecondary,
-              ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  size.hasDiscount
+                      ? 'Rs ${size.price.toStringAsFixed(0)} \u2192 Rs ${size.finalPrice.toStringAsFixed(0)} '
+                            '(${size.discountPercentage.toStringAsFixed(0)}% off)'
+                      : 'Rs ${size.finalPrice.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: AppSizes.fontSizeSm,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (size.costPrice != null && size.costPrice! > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Cost: Rs ${size.costPrice!.toStringAsFixed(0)}'
+                      ' • ${margin != null && margin < 0 ? "Loss" : "Margin"}: '
+                      'Rs ${margin != null ? margin.abs().toStringAsFixed(0) : "0"}'
+                      '${marginPct != null ? " (${marginPct.abs().toStringAsFixed(0)}%)" : ""}',
+                      style: TextStyle(
+                        fontSize: AppSizes.fontSizeSm,
+                        fontWeight: FontWeight.w500,
+                        color: margin != null && margin < 0
+                            ? AppColors.error
+                            : AppColors.success,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             trailing: IconButton(
               icon: const Icon(
@@ -413,37 +606,57 @@ class _AddSizeForm extends StatefulWidget {
 class _AddSizeFormState extends State<_AddSizeForm> {
   final _labelController = TextEditingController();
   final _priceController = TextEditingController();
-  final _discountController = TextEditingController();
+  final _discountPercentageController = TextEditingController();
+  final _costPriceController = TextEditingController();
+
+  double get _price => double.tryParse(_priceController.text) ?? 0;
+  double get _discountPercentage =>
+      (double.tryParse(_discountPercentageController.text) ?? 0)
+          .clamp(0, 100)
+          .toDouble();
+  double get _costPrice => double.tryParse(_costPriceController.text) ?? 0;
 
   @override
   void dispose() {
     _labelController.dispose();
     _priceController.dispose();
-    _discountController.dispose();
+    _discountPercentageController.dispose();
+    _costPriceController.dispose();
     super.dispose();
   }
 
   void _handleAdd() {
     final label = _labelController.text.trim();
-    final price = double.tryParse(_priceController.text) ?? 0;
-    final discount = double.tryParse(_discountController.text);
-
-    if (label.isEmpty || price <= 0) return;
+    if (label.isEmpty || _price <= 0) return;
 
     context.read<AddProductViewModel>().addSize(
       label: label,
-      price: price,
-      discountPrice: (discount != null && discount > 0) ? discount : null,
+      price: _price,
+      discountPercentage: _discountPercentage,
+      costPrice: _costPrice > 0 ? _costPrice : null,
     );
 
     _labelController.clear();
     _priceController.clear();
-    _discountController.clear();
+    _discountPercentageController.clear();
+    _costPriceController.clear();
+    setState(() {}); // refresh the live preview back to blank
     FocusScope.of(context).unfocus();
   }
 
   @override
   Widget build(BuildContext context) {
+    final previewFinalPrice = ProductModel.calculateFinalPrice(
+      _price,
+      _discountPercentage,
+    );
+    final previewMargin = _costPrice > 0
+        ? previewFinalPrice - _costPrice
+        : null;
+    final previewMarginPct = (previewMargin != null && previewFinalPrice > 0)
+        ? (previewMargin / previewFinalPrice) * 100
+        : null;
+
     return Card(
       elevation: AppSizes.cardElevation,
       shape: RoundedRectangleBorder(
@@ -457,7 +670,7 @@ class _AddSizeFormState extends State<_AddSizeForm> {
               controller: _labelController,
               decoration: const InputDecoration(
                 labelText: 'Size label',
-                hintText: 'e.g. 250g, 1Kg, Dozen',
+                hintText: 'e.g. 1 Liter, 5Kg, Dozen',
               ),
             ),
             const SizedBox(height: AppSizes.sm),
@@ -469,23 +682,77 @@ class _AddSizeFormState extends State<_AddSizeForm> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(labelText: 'Price'),
+                    decoration: const InputDecoration(
+                      labelText: 'Price',
+                      prefixText: 'Rs ',
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: AppSizes.sm),
                 Expanded(
                   child: TextField(
-                    controller: _discountController,
+                    controller: _discountPercentageController,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Discount price',
+                      labelText: 'Discount',
+                      suffixText: '%',
                     ),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: AppSizes.sm),
+            TextField(
+              controller: _costPriceController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Cost price (optional)',
+                prefixText: 'Rs ',
+                helperText: 'Used to calculate profit margin for this size',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            if (_price > 0) ...[
+              const SizedBox(height: AppSizes.xs),
+              Container(
+                padding: const EdgeInsets.all(AppSizes.xs),
+                decoration: BoxDecoration(
+                  color: AppColors.lightContainer,
+                  borderRadius: BorderRadius.circular(AppSizes.borderRadiusSm),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Selling Price: Rs ${previewFinalPrice.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: AppSizes.fontSizeSm,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (previewMargin != null)
+                      Text(
+                        'Margin: Rs ${previewMargin.abs().toStringAsFixed(0)}'
+                        '${previewMarginPct != null ? " (${previewMarginPct.abs().toStringAsFixed(0)}%)" : ""}',
+                        style: TextStyle(
+                          fontSize: AppSizes.fontSizeSm,
+                          fontWeight: FontWeight.bold,
+                          color: previewMargin < 0
+                              ? AppColors.error
+                              : AppColors.success,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: AppSizes.sm),
             SizedBox(
               width: double.infinity,

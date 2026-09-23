@@ -10,6 +10,7 @@ import 'package:katha_management/ui/features/add_payment/payment_view.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
 import 'package:katha_management/ui/party_history/party_history_view.dart';
+import 'package:katha_management/ui/settings_view/settings_view.dart';
 import 'package:provider/provider.dart';
 
 class DashboardView extends StatelessWidget {
@@ -38,7 +39,18 @@ class _HomeViewBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.pushNamed(context, SettingsView.routeName);
+            },
+          ),
+        ],
+      ),
       body: Consumer<DashboardViewmodel>(
         builder: (context, vm, _) {
           if (vm.isLoading && vm.totalPartiesCount == 0) {
