@@ -1,6 +1,5 @@
-// lib/ui/customers/customers_view.dart
-
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
 import 'package:provider/provider.dart';
 
@@ -37,10 +36,11 @@ class _CustomersViewBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Customers'),
+        title: const Text(AppStrings.customersTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add_alt_outlined),
+            tooltip: AppStrings.addPartyTitle,
             onPressed: () async {
               await Navigator.pushNamed(context, AddPartyView.routeName);
               if (context.mounted) {
@@ -65,7 +65,7 @@ class _CustomersViewBody extends StatelessWidget {
                   child: TextField(
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.search),
-                      hintText: 'Search by name or phone',
+                      hintText: AppStrings.searchCustomersHint,
                     ),
                     onChanged: (value) => context
                         .read<CustomersViewModel>()
@@ -86,7 +86,7 @@ class _CustomersViewBody extends StatelessWidget {
                   child: vm.parties.isEmpty
                       ? const Center(
                           child: Text(
-                            'No customers yet',
+                            AppStrings.noCustomersYet,
                             style: TextStyle(color: AppColors.textSecondary),
                           ),
                         )
@@ -156,7 +156,7 @@ class _CustomerTile extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          summary.partyPhone ?? 'No phone on file',
+          summary.partyPhone ?? AppStrings.noPhoneOnFile,
           style: const TextStyle(
             fontSize: AppSizes.fontSizeSm,
             color: AppColors.textSecondary,
@@ -171,7 +171,7 @@ class _CustomerTile extends StatelessWidget {
                 ),
               )
             : const Text(
-                'Settled',
+                AppStrings.settled,
                 style: TextStyle(
                   fontSize: AppSizes.fontSizeSm,
                   color: AppColors.success,

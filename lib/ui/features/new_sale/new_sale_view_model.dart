@@ -95,6 +95,7 @@ class NewSaleViewModel extends ChangeNotifier {
   List<SaleItemModel> get customItems => List.unmodifiable(_customItems);
 
   double paidAmount = 0;
+  PaymentMode paymentMode = PaymentMode.cash;
   String? note;
 
   bool isSaving = false;
@@ -298,6 +299,11 @@ class NewSaleViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPaymentMode(PaymentMode mode) {
+    paymentMode = mode;
+    notifyListeners();
+  }
+
   void setNote(String value) {
     note = value;
     notifyListeners();
@@ -339,7 +345,10 @@ class NewSaleViewModel extends ChangeNotifier {
           partyName: partyName.trim(),
           partyPhone: partyPhone.trim().isEmpty ? null : partyPhone.trim(),
           amount: paidAmount,
-          note: 'Paid upfront on Sale',
+          mode: paymentMode,
+          note: note != null && note!.trim().isNotEmpty
+              ? note!.trim()
+              : 'Paid upfront on Sale',
         );
 
         final allocation = PaymentAllocationModel(
@@ -373,6 +382,7 @@ class NewSaleViewModel extends ChangeNotifier {
     _selectedItems.clear();
     _customItems.clear();
     paidAmount = 0;
+    paymentMode = PaymentMode.cash;
     note = null;
   }
 }

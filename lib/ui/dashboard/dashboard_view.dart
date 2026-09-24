@@ -1,6 +1,5 @@
-// lib/ui/dashboard/dashboard_view.dart
-
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/party_balance_summary.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
@@ -40,11 +39,11 @@ class _HomeViewBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: const Text(AppStrings.dashboardTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
+            tooltip: AppStrings.navSettings,
             onPressed: () {
               Navigator.pushNamed(context, SettingsView.routeName);
             },
@@ -70,11 +69,11 @@ class _HomeViewBody extends StatelessWidget {
                 const SizedBox(height: AppSizes.spaceBtwSections),
                 const _QuickActions(),
                 const SizedBox(height: AppSizes.spaceBtwSections),
-                const _SectionHeader(title: 'Top Pending Parties'),
+                const _SectionHeader(title: AppStrings.topPendingParties),
                 const SizedBox(height: AppSizes.spaceBtwItems),
                 _PendingPartiesList(parties: vm.topPendingParties),
                 const SizedBox(height: AppSizes.spaceBtwSections),
-                const _SectionHeader(title: 'Recent Activity'),
+                const _SectionHeader(title: AppStrings.recentActivity),
                 const SizedBox(height: AppSizes.spaceBtwItems),
                 _RecentActivityList(items: vm.recentActivity),
                 const SizedBox(height: AppSizes.spaceBtwSections),
@@ -137,7 +136,7 @@ class _SummaryCards extends StatelessWidget {
           Expanded(
             flex: 2,
             child: _SummaryLargeCard(
-              label: "Today's Sales",
+              label: AppStrings.todaysSales,
               amount: vm.todaySales,
               icon: Icons.trending_up_rounded,
               color: AppColors.primary,
@@ -152,7 +151,7 @@ class _SummaryCards extends StatelessWidget {
               children: [
                 Expanded(
                   child: _SummarySmallCard(
-                    label: "Today's Collection",
+                    label: AppStrings.todaysCollection,
                     amount: vm.todayCollection,
                     icon: Icons.savings_outlined,
                     color: AppColors.success,
@@ -163,7 +162,7 @@ class _SummaryCards extends StatelessWidget {
 
                 Expanded(
                   child: _SummarySmallCard(
-                    label: 'Receivables',
+                    label: AppStrings.receivables,
                     amount: vm.totalReceivables,
                     icon: Icons.account_balance_wallet_outlined,
                     color: AppColors.tetraColor,
@@ -327,7 +326,7 @@ class _QuickActions extends StatelessWidget {
     final actions = [
       (
         Icons.point_of_sale_outlined,
-        'New Sale',
+        AppStrings.quickActionNewSale,
         () async {
           await Navigator.pushNamed(context, NewSaleView.routeName);
           if (context.mounted) {
@@ -337,7 +336,7 @@ class _QuickActions extends StatelessWidget {
       ),
       (
         Icons.receipt_long_outlined,
-        'New Order',
+        AppStrings.quickActionNewOrder,
         () async {
           await Navigator.pushNamed(context, NewOrderView.routeName);
           if (context.mounted) {
@@ -347,7 +346,7 @@ class _QuickActions extends StatelessWidget {
       ),
       (
         Icons.payments_outlined,
-        'Add Payment',
+        AppStrings.quickActionAddPayment,
         () async {
           await Navigator.pushNamed(context, PaymentView.routeName);
           if (context.mounted) {
@@ -357,7 +356,7 @@ class _QuickActions extends StatelessWidget {
       ),
       (
         Icons.person_add_alt_outlined,
-        'Add Party',
+        AppStrings.quickActionAddParty,
         () async {
           await Navigator.pushNamed(context, AddPartyView.routeName);
           if (context.mounted) {
@@ -450,7 +449,7 @@ class _PendingPartiesList extends StatelessWidget {
   Widget build(BuildContext context) {
     if (parties.isEmpty) {
       return const Text(
-        'No pending balances',
+        AppStrings.noPendingBalances,
         style: TextStyle(color: AppColors.textSecondary),
       );
     }
@@ -510,7 +509,7 @@ class _PendingPartyTile extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        party.partyPhone ?? 'No phone on file',
+        party.partyPhone ?? AppStrings.noPhoneOnFile,
         style: const TextStyle(
           fontSize: AppSizes.fontSizeSm,
           color: AppColors.textSecondary,
@@ -529,7 +528,9 @@ class _PendingPartyTile extends StatelessWidget {
           ),
           const SizedBox(height: AppSizes.xs),
           Text(
-            days != null ? '${days}d overdue' : 'Opening balance',
+            days != null
+                ? '$days${AppStrings.daysOverdueSuffix}'
+                : AppStrings.openingBalanceLabel,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
               color: isOverdue ? AppColors.error : AppColors.warning,
@@ -549,7 +550,7 @@ class _RecentActivityList extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return const Text(
-        'No recent activity',
+        AppStrings.noRecentActivity,
         style: TextStyle(color: AppColors.textSecondary),
       );
     }
@@ -574,14 +575,22 @@ class _ActivityTile extends StatelessWidget {
   (IconData, Color, String) get _typeMeta {
     switch (item.type) {
       case ActivityType.sale:
-        return (Icons.arrow_upward_rounded, AppColors.primary, 'Sale');
+        return (
+          Icons.arrow_upward_rounded,
+          AppColors.primary,
+          AppStrings.activityTypeSale,
+        );
       case ActivityType.payment:
-        return (Icons.arrow_downward_rounded, AppColors.success, 'Payment');
+        return (
+          Icons.arrow_downward_rounded,
+          AppColors.success,
+          AppStrings.activityTypePayment,
+        );
       case ActivityType.order:
         return (
           Icons.receipt_long_outlined,
           AppColors.secondary,
-          'Order Placed',
+          AppStrings.activityTypeOrder,
         );
     }
   }

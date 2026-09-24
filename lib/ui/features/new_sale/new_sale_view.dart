@@ -3,8 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/party_model.dart';
+import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/models/product/product_model.dart';
 import 'package:katha_management/core/models/product/product_size_model.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
@@ -69,12 +71,12 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New Sale')),
+      appBar: AppBar(title: const Text(AppStrings.newSaleTitle)),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
           // ─── Party Selection ──────────────────────────────────────
-          const _SectionLabel('Party Details'),
+          const _SectionLabel(AppStrings.partyDetailsSection),
           const SizedBox(height: AppSizes.sm),
 
           if (vm.linkedParty != null) ...[
@@ -100,7 +102,9 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
             ],
             TextField(
               controller: _partyNameController,
-              decoration: const InputDecoration(labelText: 'Party name *'),
+              decoration: const InputDecoration(
+                labelText: AppStrings.partyNameLabel,
+              ),
               onChanged: (value) =>
                   context.read<NewSaleViewModel>().setPartyManual(
                     name: value,
@@ -111,7 +115,9 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
             TextField(
               controller: _partyPhoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Phone (optional)'),
+              decoration: const InputDecoration(
+                labelText: AppStrings.partyPhoneLabel,
+              ),
               onChanged: (value) =>
                   context.read<NewSaleViewModel>().setPartyManual(
                     name: _partyNameController.text,
@@ -126,9 +132,9 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const _SectionLabel('Select Products'),
+              const _SectionLabel(AppStrings.selectProductsSection),
               Text(
-                '${vm.items.length} items added',
+                '${vm.items.length} ${AppStrings.itemsPlural} added',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -138,7 +144,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           ),
           const SizedBox(height: AppSizes.xs),
           const Text(
-            'Check products to add. Select size variants from dropdown and customize prices if needed.',
+            AppStrings.selectProductsInstruction,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
               color: AppColors.textSecondary,
@@ -149,7 +155,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search products by name, sku, or category...',
+              hintText: AppStrings.searchCatalogHint,
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
@@ -181,7 +187,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
               ),
               child: const Center(
                 child: Text(
-                  'No products found in catalog. You can add one below.',
+                  AppStrings.noProductsFoundInCatalog,
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
@@ -200,25 +206,130 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           const SizedBox(height: AppSizes.spaceBtwSections),
 
           // ─── Payment & Settlement ──────────────────────────────────
-          const _SectionLabel('Payment & Settlement'),
+          const _SectionLabel(AppStrings.paymentAndSettlementSection),
+          const SizedBox(height: AppSizes.xs),
+
+          // Quick Presets (Full, Half, Unpaid)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ActionChip(
+                  avatar: const Icon(
+                    Icons.check_circle_outline,
+                    size: 16,
+                    color: AppColors.success,
+                  ),
+                  label: Text(
+                    '${AppStrings.quickFullPaid} (Rs ${vm.totalAmount.toStringAsFixed(0)})',
+                  ),
+                  onPressed: vm.totalAmount <= 0
+                      ? null
+                      : () {
+                          _paidAmountController.text = vm.totalAmount
+                              .toStringAsFixed(0);
+                          context.read<NewSaleViewModel>().setPaidAmount(
+                            vm.totalAmount,
+                          );
+                        },
+                ),
+                const SizedBox(width: AppSizes.xs),
+                ActionChip(
+                  avatar: const Icon(
+                    Icons.pie_chart_outline,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                  label: Text(
+                    '${AppStrings.quickHalfPaid} (Rs ${(vm.totalAmount / 2).toStringAsFixed(0)})',
+                  ),
+                  onPressed: vm.totalAmount <= 0
+                      ? null
+                      : () {
+                          final half = (vm.totalAmount / 2).roundToDouble();
+                          _paidAmountController.text = half.toStringAsFixed(0);
+                          context.read<NewSaleViewModel>().setPaidAmount(half);
+                        },
+                ),
+                const SizedBox(width: AppSizes.xs),
+                ActionChip(
+                  avatar: const Icon(
+                    Icons.cancel_outlined,
+                    size: 16,
+                    color: AppColors.tetraColor,
+                  ),
+                  label: const Text(AppStrings.quickUnpaid),
+                  onPressed: () {
+                    _paidAmountController.text = '0';
+                    context.read<NewSaleViewModel>().setPaidAmount(0);
+                  },
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: AppSizes.sm),
+
           TextField(
             controller: _paidAmountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
-              labelText: 'Paid amount upfront (optional)',
-              prefixText: 'Rs ',
-              helperText: 'Will automatically be credited & recorded to ledger',
+              labelText: AppStrings.paidAmountUpfrontLabel,
+              prefixText: AppStrings.currencyPrefix,
+              helperText: AppStrings.paidAmountHelper,
             ),
             onChanged: (value) => context
                 .read<NewSaleViewModel>()
                 .setPaidAmount(double.tryParse(value) ?? 0),
           ),
           const SizedBox(height: AppSizes.sm),
+
+          // Payment Mode Selector (when paidAmount > 0)
+          if (vm.paidAmount > 0) ...[
+            const Text(
+              AppStrings.paymentModeLabel,
+              style: TextStyle(
+                fontSize: AppSizes.fontSizeSm,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: AppSizes.xs),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: PaymentMode.values.map((mode) {
+                  final isSelected = vm.paymentMode == mode;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: AppSizes.xs),
+                    child: ChoiceChip(
+                      label: Text(mode.label),
+                      selected: isSelected,
+                      selectedColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: isSelected
+                            ? AppColors.textWhite
+                            : AppColors.textPrimary,
+                      ),
+                      onSelected: (_) =>
+                          context.read<NewSaleViewModel>().setPaymentMode(mode),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: AppSizes.sm),
+          ],
+
           TextField(
             controller: _noteController,
             maxLines: 2,
-            decoration: const InputDecoration(labelText: 'Note (optional)'),
+            decoration: const InputDecoration(
+              labelText: AppStrings.noteOptional,
+            ),
             onChanged: (value) =>
                 context.read<NewSaleViewModel>().setNote(value),
           ),
@@ -248,7 +359,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Sale saved successfully'),
+                            content: Text(AppStrings.saleSavedSuccess),
                           ),
                         );
                         if (Navigator.canPop(context)) {
@@ -272,7 +383,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
                       ),
                     )
                   : const Text(
-                      'Save Sale',
+                      AppStrings.saveSaleButton,
                       style: TextStyle(
                         color: AppColors.textWhite,
                         fontWeight: FontWeight.bold,
@@ -403,8 +514,8 @@ class _ProductCardWithDropdownState extends State<_ProductCardWithDropdown> {
                 if (!isSelected)
                   Text(
                     hasSizes
-                        ? 'from Rs ${widget.product.sizes.first.finalPrice.toStringAsFixed(0)}'
-                        : 'Rs ${widget.product.finalPrice.toStringAsFixed(0)}',
+                        ? 'from ${AppStrings.currencyPrefix}${widget.product.sizes.first.finalPrice.toStringAsFixed(0)}'
+                        : '${AppStrings.currencyPrefix}${widget.product.finalPrice.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: AppSizes.fontSizeSm,
                       fontWeight: FontWeight.w600,
@@ -413,7 +524,7 @@ class _ProductCardWithDropdownState extends State<_ProductCardWithDropdown> {
                   ),
                 if (isSelected && state != null)
                   Text(
-                    'Rs ${state.subtotal.toStringAsFixed(0)}',
+                    '${AppStrings.currencyPrefix}${state.subtotal.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: AppSizes.fontSizeMd,
                       fontWeight: FontWeight.bold,
@@ -431,8 +542,9 @@ class _ProductCardWithDropdownState extends State<_ProductCardWithDropdown> {
               if (hasSizes) ...[
                 const SizedBox(height: 4),
                 DropdownButtonFormField<ProductSizeModel>(
+                  isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Select Package Size',
+                    labelText: AppStrings.selectPackageSizeLabel,
                     prefixIcon: Icon(Icons.inventory_2_outlined, size: 20),
                     contentPadding: EdgeInsets.symmetric(
                       horizontal: 10,
@@ -448,8 +560,10 @@ class _ProductCardWithDropdownState extends State<_ProductCardWithDropdown> {
                     return DropdownMenuItem<ProductSizeModel>(
                       value: size,
                       child: Text(
-                        '${size.label}  —  Rs ${size.finalPrice.toStringAsFixed(0)}${size.hasDiscount ? ' (${size.discountPercentage.toStringAsFixed(0)}% off)' : ''}',
+                        '${size.label}  —  ${AppStrings.currencyPrefix}${size.finalPrice.toStringAsFixed(0)}${size.hasDiscount ? ' (${size.discountPercentage.toStringAsFixed(0)}${AppStrings.percentSuffix} off)' : ''}',
                         style: const TextStyle(fontSize: AppSizes.fontSizeSm),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     );
                   }).toList(),
@@ -541,15 +655,15 @@ class _ProductCardWithDropdownState extends State<_ProductCardWithDropdown> {
                           decimal: true,
                         ),
                         decoration: InputDecoration(
-                          labelText: 'Price',
-                          prefixText: 'Rs ',
+                          labelText: AppStrings.priceLabel,
+                          prefixText: AppStrings.currencyPrefix,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 8,
                           ),
                           isDense: true,
                           helperText: state.unitPrice != state.defaultPrice
-                              ? 'Default: Rs ${state.defaultPrice.toStringAsFixed(0)}'
+                              ? 'Default: ${AppStrings.currencyPrefix}${state.defaultPrice.toStringAsFixed(0)}'
                               : null,
                         ),
                         onChanged: (val) {
@@ -639,7 +753,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                       Icon(Icons.add_shopping_cart, color: AppColors.secondary),
                       SizedBox(width: AppSizes.sm),
                       Text(
-                        'Add Custom / Non-Catalog Item',
+                        AppStrings.customItemSection,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.secondary,
@@ -655,7 +769,9 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
               const SizedBox(height: AppSizes.sm),
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Item name'),
+                decoration: const InputDecoration(
+                  labelText: AppStrings.itemNameLabel,
+                ),
               ),
               const SizedBox(height: AppSizes.sm),
               Row(
@@ -666,7 +782,9 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(labelText: 'Qty'),
+                      decoration: const InputDecoration(
+                        labelText: AppStrings.quantityLabel,
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSizes.sm),
@@ -677,8 +795,8 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                         decimal: true,
                       ),
                       decoration: const InputDecoration(
-                        labelText: 'Unit price',
-                        prefixText: 'Rs ',
+                        labelText: AppStrings.rateOrPriceLabel,
+                        prefixText: AppStrings.currencyPrefix,
                       ),
                     ),
                   ),
@@ -690,8 +808,8 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                         decimal: true,
                       ),
                       decoration: const InputDecoration(
-                        labelText: 'Discount',
-                        prefixText: 'Rs ',
+                        labelText: AppStrings.discountLabel,
+                        prefixText: AppStrings.currencyPrefix,
                       ),
                     ),
                   ),
@@ -702,7 +820,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: _handleAdd,
-                  child: const Text('Add Custom Item'),
+                  child: const Text(AppStrings.addCustomItemButton),
                 ),
               ),
             ],
@@ -715,13 +833,13 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(item.productName),
                   subtitle: Text(
-                    '${item.quantity} x Rs ${item.unitPrice.toStringAsFixed(0)}',
+                    '${item.quantity} x ${AppStrings.currencyPrefix}${item.unitPrice.toStringAsFixed(0)}',
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Rs ${item.subtotal.toStringAsFixed(0)}',
+                        '${AppStrings.currencyPrefix}${item.subtotal.toStringAsFixed(0)}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       IconButton(
@@ -776,7 +894,7 @@ class _LinkedPartyCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          party.phone ?? 'No phone on file',
+          party.phone ?? AppStrings.noPhoneOnFile,
           style: const TextStyle(
             fontSize: AppSizes.fontSizeSm,
             color: AppColors.textSecondary,
@@ -801,15 +919,22 @@ class _PartyPickerDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<PartyModel>(
+      isExpanded: true,
       decoration: const InputDecoration(
-        labelText: 'Select Existing Customer',
+        labelText: AppStrings.selectExistingCustomer,
         prefixIcon: Icon(Icons.person_outline),
       ),
       items: parties.map((party) {
+        final phoneText =
+            (party.phone != null && party.phone!.trim().isNotEmpty)
+            ? ' (${party.phone!.trim()})'
+            : '';
         return DropdownMenuItem<PartyModel>(
           value: party,
           child: Text(
-            '${party.name}${party.phone != null ? ' (${party.phone})' : ''}',
+            '${party.name}$phoneText',
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         );
       }).toList(),
@@ -857,14 +982,14 @@ class _TotalsCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Total Sale Amount',
+                  AppStrings.totalAmountLabel,
                   style: TextStyle(
                     fontSize: AppSizes.fontSizeMd,
                     color: AppColors.textSecondary,
                   ),
                 ),
                 Text(
-                  'Rs ${vm.totalAmount.toStringAsFixed(0)}',
+                  '${AppStrings.currencyPrefix}${vm.totalAmount.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: AppSizes.fontSizeLg,
                     fontWeight: FontWeight.bold,
@@ -879,14 +1004,14 @@ class _TotalsCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Paid Upfront',
+                    AppStrings.paidUpfrontLabel,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,
                       color: AppColors.textSecondary,
                     ),
                   ),
                   Text(
-                    'Rs ${vm.paidAmount.toStringAsFixed(0)}',
+                    '${AppStrings.currencyPrefix}${vm.paidAmount.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: AppSizes.fontSizeSm,
                       color: AppColors.success,
@@ -900,14 +1025,14 @@ class _TotalsCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Balance Due',
+                    AppStrings.balanceDueLabel,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,
                       color: AppColors.textSecondary,
                     ),
                   ),
                   Text(
-                    'Rs ${vm.balanceDue.toStringAsFixed(0)}',
+                    '${AppStrings.currencyPrefix}${vm.balanceDue.toStringAsFixed(0)}',
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,
                       color: vm.balanceDue > 0

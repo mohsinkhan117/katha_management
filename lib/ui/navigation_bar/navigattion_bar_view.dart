@@ -1,6 +1,5 @@
-// lib/ui/navigation_bar/navigattion_bar_view.dart
-
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'package:katha_management/ui/customers/customers_view.dart';
 import 'package:katha_management/ui/dashboard/dashboard_view.dart';
@@ -38,15 +37,21 @@ class _NavigationBarViewState extends State<NavigationBarView> {
   }
 
   static const List<BottomNavigationBarItem> _items = [
-    BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.dashboard),
+      label: AppStrings.navDashboard,
+    ),
     BottomNavigationBarItem(
       icon: Icon(Icons.receipt_long_outlined),
-      label: 'Orders',
+      label: AppStrings.navOrders,
     ),
-    BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Customers'),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.people),
+      label: AppStrings.navCustomers,
+    ),
     BottomNavigationBarItem(
       icon: Icon(Icons.person_add_alt_1_outlined),
-      label: 'Add Party',
+      label: AppStrings.quickActionAddParty,
     ),
   ];
 

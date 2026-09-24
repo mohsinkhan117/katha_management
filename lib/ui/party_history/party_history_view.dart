@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/new_order/new_order_item_model.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
@@ -9,6 +10,7 @@ import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/models/sale_item_model.dart';
 import 'package:katha_management/core/models/sale_model.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
+import 'package:katha_management/core/utils/app_dialogs/collect_payment_sheet.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
@@ -48,7 +50,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
       backgroundColor: AppColors.primaryBackground,
       appBar: AppBar(
         title: Text(
-          vm.party?.name ?? 'Party History',
+          vm.party?.name ?? AppStrings.partyHistoryTitle,
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
@@ -64,18 +66,18 @@ class _PartyHistoryViewBody extends StatelessWidget {
           else ...[
             IconButton(
               icon: const Icon(Icons.picture_as_pdf_outlined),
-              tooltip: 'Export & Print PDF Statement',
+              tooltip: AppStrings.exportPrintPdfTooltip,
               onPressed: vm.party == null ? null : vm.exportPdf,
             ),
             IconButton(
               icon: const Icon(Icons.share_outlined),
-              tooltip: 'Share PDF Statement',
+              tooltip: AppStrings.sharePdfTooltip,
               onPressed: vm.party == null ? null : vm.sharePdf,
             ),
           ],
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
+            tooltip: AppStrings.refresh,
             onPressed: vm.isLoading ? null : vm.refresh,
           ),
         ],
@@ -107,7 +109,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
               ElevatedButton.icon(
                 icon: const Icon(Icons.refresh),
                 onPressed: vm.refresh,
-                label: const Text('Retry'),
+                label: const Text(AppStrings.retry),
               ),
             ],
           ),
@@ -214,12 +216,12 @@ class _BalanceHeader extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: AppSizes.xs),
-                  // Current Net Balance Badge
+                  // Current Net Balance Badge & Collect Payment
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       const Text(
-                        'Net Balance',
+                        AppStrings.netBalanceLabel,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -228,7 +230,7 @@ class _BalanceHeader extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Rs ${due.toStringAsFixed(0)}',
+                        '${AppStrings.currencyPrefix}${due.toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: AppSizes.fontSizeMd + 1,
                           fontWeight: FontWeight.bold,
@@ -237,6 +239,59 @@ class _BalanceHeader extends StatelessWidget {
                               : AppColors.success,
                         ),
                       ),
+                      if (due > 0) ...[
+                        const SizedBox(height: 4),
+                        InkWell(
+                          onTap: () async {
+                            final collected = await showCollectPaymentSheet(
+                              context,
+                              partyId: party.id,
+                              partyName: party.name,
+                              partyPhone: party.phone,
+                              suggestedAmount: due,
+                            );
+                            if (collected == true && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    AppStrings.paymentCollectedSuccess,
+                                  ),
+                                ),
+                              );
+                              vm.load();
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.add,
+                                  size: 12,
+                                  color: AppColors.success,
+                                ),
+                                SizedBox(width: 2),
+                                Text(
+                                  AppStrings.actionPay,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -249,8 +304,9 @@ class _BalanceHeader extends StatelessWidget {
               children: [
                 Expanded(
                   child: _StatCard(
-                    title: 'Total Sales',
-                    value: 'Rs ${vm.totalSalesAmount.toStringAsFixed(0)}',
+                    title: AppStrings.totalSalesStat,
+                    value:
+                        '${AppStrings.currencyPrefix}${vm.totalSalesAmount.toStringAsFixed(0)}',
                     icon: Icons.point_of_sale_outlined,
                     color: AppColors.primary,
                   ),
@@ -258,8 +314,9 @@ class _BalanceHeader extends StatelessWidget {
                 const SizedBox(width: AppSizes.sm),
                 Expanded(
                   child: _StatCard(
-                    title: 'Payments',
-                    value: 'Rs ${vm.totalPaymentsAmount.toStringAsFixed(0)}',
+                    title: AppStrings.paymentsStat,
+                    value:
+                        '${AppStrings.currencyPrefix}${vm.totalPaymentsAmount.toStringAsFixed(0)}',
                     icon: Icons.payments_outlined,
                     color: AppColors.success,
                   ),
@@ -271,8 +328,9 @@ class _BalanceHeader extends StatelessWidget {
               children: [
                 Expanded(
                   child: _StatCard(
-                    title: 'Balance Due',
-                    value: 'Rs ${due.toStringAsFixed(0)}',
+                    title: AppStrings.balanceDueStat,
+                    value:
+                        '${AppStrings.currencyPrefix}${due.toStringAsFixed(0)}',
                     icon: Icons.account_balance_wallet_outlined,
                     color: due > 0 ? AppColors.tetraColor : AppColors.success,
                   ),
@@ -280,8 +338,8 @@ class _BalanceHeader extends StatelessWidget {
                 const SizedBox(width: AppSizes.sm),
                 Expanded(
                   child: _StatCard(
-                    title: 'Orders (${vm.totalOrdersCount})',
-                    value: '${vm.pendingOrdersCount} Pending',
+                    title: '${AppStrings.ordersStat} (${vm.totalOrdersCount})',
+                    value: '${vm.pendingOrdersCount} ${AppStrings.tabPending}',
                     icon: Icons.receipt_long_outlined,
                     color: AppColors.secondary,
                   ),
@@ -313,7 +371,7 @@ class _BalanceHeader extends StatelessWidget {
                     const SizedBox(width: AppSizes.xs),
                     Expanded(
                       child: Text(
-                        '${balance!.daysSinceOldestDue} days since oldest unpaid sale invoice',
+                        '${balance!.daysSinceOldestDue} ${AppStrings.daysSinceOldestUnpaidSale}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -405,7 +463,10 @@ class _QuickActions extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.point_of_sale_outlined, size: 18),
-                label: const Text('Sale', style: TextStyle(fontSize: 13)),
+                label: const Text(
+                  AppStrings.actionSale,
+                  style: TextStyle(fontSize: 13),
+                ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
@@ -423,7 +484,10 @@ class _QuickActions extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                label: const Text('Order', style: TextStyle(fontSize: 13)),
+                label: const Text(
+                  AppStrings.actionOrder,
+                  style: TextStyle(fontSize: 13),
+                ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
@@ -441,7 +505,10 @@ class _QuickActions extends StatelessWidget {
             Expanded(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.payments_outlined, size: 18),
-                label: const Text('Pay', style: TextStyle(fontSize: 13)),
+                label: const Text(
+                  AppStrings.actionPay,
+                  style: TextStyle(fontSize: 13),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.buttonPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 10),
@@ -463,7 +530,7 @@ class _QuickActions extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton.icon(
             icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-            label: const Text('Export & Print PDF Statement'),
+            label: const Text(AppStrings.exportPrintPdfTooltip),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),
@@ -484,10 +551,13 @@ class _FilterChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = {
-      PartyHistoryFilter.all: 'All (${vm.timeline.length})',
-      PartyHistoryFilter.orders: 'Orders (${vm.orders.length})',
-      PartyHistoryFilter.sales: 'Sales (${vm.sales.length})',
-      PartyHistoryFilter.payments: 'Payments (${vm.payments.length})',
+      PartyHistoryFilter.all: '${AppStrings.filterAll} (${vm.timeline.length})',
+      PartyHistoryFilter.orders:
+          '${AppStrings.filterOrders} (${vm.orders.length})',
+      PartyHistoryFilter.sales:
+          '${AppStrings.filterSales} (${vm.sales.length})',
+      PartyHistoryFilter.payments:
+          '${AppStrings.filterPayments} (${vm.payments.length})',
     };
 
     return SingleChildScrollView(
@@ -537,7 +607,7 @@ class _TimelineList extends StatelessWidget {
               ),
               SizedBox(height: AppSizes.xs),
               Text(
-                'No transactions or orders recorded yet',
+                AppStrings.noTransactionsRecorded,
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
             ],
@@ -620,7 +690,7 @@ class _TimelineTile extends StatelessWidget {
               ),
               const SizedBox(width: AppSizes.xs),
               Text(
-                'Rs ${entry.amount.toStringAsFixed(0)}',
+                '${AppStrings.currencyPrefix}${entry.amount.toStringAsFixed(0)}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: AppSizes.fontSizeMd,
@@ -642,7 +712,7 @@ class _TimelineTile extends StatelessWidget {
           children: [
             const Divider(height: AppSizes.md),
             if (entry.order != null) _buildOrderDetails(context, entry.order!),
-            if (entry.sale != null) _buildSaleDetails(entry.sale!),
+            if (entry.sale != null) _buildSaleDetails(context, entry.sale!),
             if (entry.payment != null) _buildPaymentDetails(entry.payment!),
           ],
         ),
@@ -662,7 +732,7 @@ class _TimelineTile extends StatelessWidget {
             Row(
               children: [
                 const Text(
-                  'Status: ',
+                  '${AppStrings.status}: ',
                   style: TextStyle(
                     fontSize: AppSizes.fontSizeSm,
                     fontWeight: FontWeight.w600,
@@ -674,7 +744,7 @@ class _TimelineTile extends StatelessWidget {
             ),
             // Status Update Dropdown Menu
             PopupMenuButton<OrderStatus>(
-              tooltip: 'Change Status',
+              tooltip: AppStrings.changeStatusTooltip,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -685,7 +755,7 @@ class _TimelineTile extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Update',
+                      AppStrings.update,
                       style: TextStyle(
                         fontSize: AppSizes.fontSizeSm,
                         color: Theme.of(context).colorScheme.primary,
@@ -735,7 +805,7 @@ class _TimelineTile extends StatelessWidget {
               const SizedBox(width: AppSizes.xs),
               Expanded(
                 child: Text(
-                  'Expected Delivery: ${_dateFormat.format(order.expectedDeliveryDate!)}',
+                  '${AppStrings.expectedDeliveryPrefix}${_dateFormat.format(order.expectedDeliveryDate!)}',
                   style: const TextStyle(
                     fontSize: AppSizes.fontSizeSm,
                     color: AppColors.textSecondary,
@@ -750,7 +820,7 @@ class _TimelineTile extends StatelessWidget {
 
         // Order Items List
         const Text(
-          'Order Items:',
+          AppStrings.orderItemsLabel,
           style: TextStyle(
             fontSize: AppSizes.fontSizeSm,
             fontWeight: FontWeight.bold,
@@ -784,7 +854,7 @@ class _TimelineTile extends StatelessWidget {
               const SizedBox(width: AppSizes.xs),
               Expanded(
                 child: Text(
-                  'Note: ${order.note!}',
+                  '${AppStrings.note}: ${order.note!}',
                   style: const TextStyle(
                     fontSize: AppSizes.fontSizeSm,
                     fontStyle: FontStyle.italic,
@@ -795,6 +865,67 @@ class _TimelineTile extends StatelessWidget {
             ],
           ),
         ],
+
+        // Advance vs Balance Due & Collect Button
+        const SizedBox(height: AppSizes.sm),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${AppStrings.advancePrefix}${order.advancePaid.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: AppSizes.fontSizeSm,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.success,
+                  ),
+                ),
+                Text(
+                  '${AppStrings.duePrefix}${order.balanceDue.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: order.balanceDue > 0
+                        ? AppColors.tetraColor
+                        : AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+            if (order.balanceDue > 0 && !order.status.isTerminal)
+              ElevatedButton.icon(
+                icon: const Icon(Icons.payments_outlined, size: 14),
+                label: const Text(AppStrings.collectAdvancePayment),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.sm,
+                    vertical: AppSizes.xs,
+                  ),
+                ),
+                onPressed: () async {
+                  final collected = await showCollectPaymentSheet(
+                    context,
+                    partyId: vm.partyId,
+                    partyName: vm.party?.name ?? order.partyName,
+                    partyPhone: vm.party?.phone ?? order.partyPhone,
+                    suggestedAmount: order.balanceDue,
+                    orderId: order.id,
+                  );
+                  if (collected == true && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(AppStrings.paymentCollectedSuccess),
+                      ),
+                    );
+                    vm.load();
+                  }
+                },
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -819,8 +950,8 @@ class _TimelineTile extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${item.quantity.toStringAsFixed(item.quantity.truncateToDouble() == item.quantity ? 0 : 2)} × Rs ${item.unitPrice.toStringAsFixed(0)}'
-                  '${item.discount > 0 ? ' (-Rs ${item.discount.toStringAsFixed(0)})' : ''}',
+                  '${item.quantity.toStringAsFixed(item.quantity.truncateToDouble() == item.quantity ? 0 : 2)} × ${AppStrings.currencyPrefix}${item.unitPrice.toStringAsFixed(0)}'
+                  '${item.discount > 0 ? ' (-${AppStrings.currencyPrefix}${item.discount.toStringAsFixed(0)})' : ''}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
@@ -830,7 +961,7 @@ class _TimelineTile extends StatelessWidget {
             ),
           ),
           Text(
-            'Rs ${item.subtotal.toStringAsFixed(0)}',
+            '${AppStrings.currencyPrefix}${item.subtotal.toStringAsFixed(0)}',
             style: const TextStyle(
               fontSize: AppSizes.fontSizeSm,
               fontWeight: FontWeight.bold,
@@ -842,7 +973,7 @@ class _TimelineTile extends StatelessWidget {
   }
 
   // ─── Sale Details Dropdown ──────────────────────────────────────────
-  Widget _buildSaleDetails(SaleModel sale) {
+  Widget _buildSaleDetails(BuildContext context, SaleModel sale) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -852,7 +983,7 @@ class _TimelineTile extends StatelessWidget {
             Row(
               children: [
                 const Text(
-                  'Status: ',
+                  '${AppStrings.status}: ',
                   style: TextStyle(
                     fontSize: AppSizes.fontSizeSm,
                     fontWeight: FontWeight.w600,
@@ -863,7 +994,7 @@ class _TimelineTile extends StatelessWidget {
               ],
             ),
             Text(
-              'Date: ${_dateFormat.format(sale.saleDate)}',
+              '${AppStrings.datePrefix}${_dateFormat.format(sale.saleDate)}',
               style: const TextStyle(
                 fontSize: AppSizes.fontSizeSm,
                 color: AppColors.textSecondary,
@@ -876,7 +1007,7 @@ class _TimelineTile extends StatelessWidget {
         // Items Breakdown
         if (sale.items.isNotEmpty) ...[
           const Text(
-            'Sale Items:',
+            AppStrings.saleItemsLabel,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
               fontWeight: FontWeight.bold,
@@ -903,7 +1034,7 @@ class _TimelineTile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Paid: Rs ${sale.paidAmount.toStringAsFixed(0)}',
+              '${AppStrings.paidPrefix}${sale.paidAmount.toStringAsFixed(0)}',
               style: const TextStyle(
                 fontSize: AppSizes.fontSizeSm,
                 fontWeight: FontWeight.w600,
@@ -911,7 +1042,7 @@ class _TimelineTile extends StatelessWidget {
               ),
             ),
             Text(
-              'Due: Rs ${sale.balanceDue.toStringAsFixed(0)}',
+              '${AppStrings.duePrefix}${sale.balanceDue.toStringAsFixed(0)}',
               style: TextStyle(
                 fontSize: AppSizes.fontSizeSm,
                 fontWeight: FontWeight.bold,
@@ -926,11 +1057,48 @@ class _TimelineTile extends StatelessWidget {
         if (sale.note != null && sale.note!.trim().isNotEmpty) ...[
           const SizedBox(height: AppSizes.xs),
           Text(
-            'Note: ${sale.note!}',
+            '${AppStrings.note}: ${sale.note!}',
             style: const TextStyle(
               fontSize: AppSizes.fontSizeSm,
               fontStyle: FontStyle.italic,
               color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+
+        // Collect Payment Button if Balance Due > 0
+        if (sale.balanceDue > 0) ...[
+          const SizedBox(height: AppSizes.sm),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.payments_outlined, size: 16),
+              label: const Text(AppStrings.collectPayment),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.md,
+                  vertical: AppSizes.xs,
+                ),
+              ),
+              onPressed: () async {
+                final collected = await showCollectPaymentSheet(
+                  context,
+                  partyId: vm.partyId,
+                  partyName: vm.party?.name ?? sale.partyName,
+                  partyPhone: vm.party?.phone ?? sale.partyPhone,
+                  suggestedAmount: sale.balanceDue,
+                  saleId: sale.id,
+                );
+                if (collected == true && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(AppStrings.paymentCollectedSuccess),
+                    ),
+                  );
+                  vm.load();
+                }
+              },
             ),
           ),
         ],
@@ -958,8 +1126,8 @@ class _TimelineTile extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${item.quantity.toStringAsFixed(item.quantity.truncateToDouble() == item.quantity ? 0 : 2)} × Rs ${item.unitPrice.toStringAsFixed(0)}'
-                  '${item.discount > 0 ? ' (-Rs ${item.discount.toStringAsFixed(0)})' : ''}',
+                  '${item.quantity.toStringAsFixed(item.quantity.truncateToDouble() == item.quantity ? 0 : 2)} × ${AppStrings.currencyPrefix}${item.unitPrice.toStringAsFixed(0)}'
+                  '${item.discount > 0 ? ' (-${AppStrings.currencyPrefix}${item.discount.toStringAsFixed(0)})' : ''}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
@@ -969,7 +1137,7 @@ class _TimelineTile extends StatelessWidget {
             ),
           ),
           Text(
-            'Rs ${item.subtotal.toStringAsFixed(0)}',
+            '${AppStrings.currencyPrefix}${item.subtotal.toStringAsFixed(0)}',
             style: const TextStyle(
               fontSize: AppSizes.fontSizeSm,
               fontWeight: FontWeight.bold,
@@ -989,7 +1157,7 @@ class _TimelineTile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Payment Mode: ${payment.mode.label}',
+              '${AppStrings.paymentModePrefix}${payment.mode.label}',
               style: const TextStyle(
                 fontSize: AppSizes.fontSizeSm,
                 fontWeight: FontWeight.w600,
@@ -997,7 +1165,7 @@ class _TimelineTile extends StatelessWidget {
               ),
             ),
             Text(
-              'Date: ${_dateFormat.format(payment.paymentDate)}',
+              '${AppStrings.datePrefix}${_dateFormat.format(payment.paymentDate)}',
               style: const TextStyle(
                 fontSize: AppSizes.fontSizeSm,
                 color: AppColors.textSecondary,
@@ -1008,7 +1176,7 @@ class _TimelineTile extends StatelessWidget {
         if (payment.note != null && payment.note!.trim().isNotEmpty) ...[
           const SizedBox(height: AppSizes.xs),
           Text(
-            'Note: ${payment.note!}',
+            '${AppStrings.note}: ${payment.note!}',
             style: const TextStyle(
               fontSize: AppSizes.fontSizeSm,
               fontStyle: FontStyle.italic,

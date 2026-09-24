@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/product/product_model.dart';
 import 'package:katha_management/core/models/product/product_size_model.dart';
@@ -91,16 +92,22 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(vm.isEditing ? 'Edit Product' : 'Add Product'),
+        title: Text(
+          vm.isEditing
+              ? AppStrings.editProductTitle
+              : AppStrings.addProductTitle,
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
-          const _SectionLabel('Basic Info'),
+          const _SectionLabel(AppStrings.basicInfoSection),
           const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Product name *'),
+            decoration: const InputDecoration(
+              labelText: AppStrings.productNameLabel,
+            ),
             onChanged: (value) =>
                 context.read<AddProductViewModel>().setName(value),
           ),
@@ -109,7 +116,7 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
             controller: _descriptionController,
             maxLines: 2,
             decoration: const InputDecoration(
-              labelText: 'Description (optional)',
+              labelText: AppStrings.descriptionOptional,
             ),
             onChanged: (value) =>
                 context.read<AddProductViewModel>().setDescription(value),
@@ -120,7 +127,9 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
               Expanded(
                 child: TextField(
                   controller: _skuController,
-                  decoration: const InputDecoration(labelText: 'SKU / Code'),
+                  decoration: const InputDecoration(
+                    labelText: AppStrings.skuLabel,
+                  ),
                   onChanged: (value) =>
                       context.read<AddProductViewModel>().setSku(value),
                 ),
@@ -129,7 +138,9 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
               Expanded(
                 child: TextField(
                   controller: _categoryController,
-                  decoration: const InputDecoration(labelText: 'Category'),
+                  decoration: const InputDecoration(
+                    labelText: AppStrings.categoryLabel,
+                  ),
                   onChanged: (value) =>
                       context.read<AddProductViewModel>().setCategory(value),
                 ),
@@ -140,9 +151,8 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
           TextField(
             controller: _unitController,
             decoration: const InputDecoration(
-              labelText: 'Base unit (optional)',
-              helperText:
-                  'e.g. piece, kg, box — what sizes below are variants of',
+              labelText: AppStrings.baseUnitLabel,
+              helperText: AppStrings.baseUnitHelper,
             ),
             onChanged: (value) =>
                 context.read<AddProductViewModel>().setUnit(value),
@@ -151,10 +161,10 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
           const SizedBox(height: AppSizes.spaceBtwSections),
 
           // ─── Selling Price ──────────────────────────────────────
-          const _SectionLabel('Selling Price'),
+          const _SectionLabel(AppStrings.sellingPriceSection),
           const SizedBox(height: AppSizes.xs),
           const Text(
-            'What the customer sees and pays.',
+            AppStrings.sellingPriceDescription,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
               color: AppColors.textSecondary,
@@ -170,8 +180,8 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Retail price *',
-                    prefixText: 'Rs ',
+                    labelText: AppStrings.retailPriceLabel,
+                    prefixText: AppStrings.currencyPrefix,
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
@@ -186,8 +196,8 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Discount',
-                    suffixText: '%',
+                    labelText: AppStrings.discountLabel,
+                    suffixText: AppStrings.percentSuffix,
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
@@ -207,11 +217,10 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
           const SizedBox(height: AppSizes.spaceBtwSections),
 
           // ─── Cost & Profit Margin ───────────────────────────────
-          const _SectionLabel('Cost & Profit Margin'),
+          const _SectionLabel(AppStrings.costAndProfitMarginSection),
           const SizedBox(height: AppSizes.xs),
           const Text(
-            'What this product costs you to buy or produce. Used only '
-            'to show your profit below — customers never see this.',
+            AppStrings.costAndProfitMarginDescription,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
               color: AppColors.textSecondary,
@@ -227,8 +236,8 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Cost price',
-                    prefixText: 'Rs ',
+                    labelText: AppStrings.costPriceLabel,
+                    prefixText: AppStrings.currencyPrefix,
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
@@ -241,7 +250,7 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                   controller: _stockQuantityController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'Stock qty (optional)',
+                    labelText: AppStrings.stockQuantityLabel,
                   ),
                   onChanged: (value) => context
                       .read<AddProductViewModel>()
@@ -257,16 +266,16 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
           ),
 
           const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel('Status'),
+          const _SectionLabel(AppStrings.statusSection),
           const SizedBox(height: AppSizes.sm),
           _StatusSelector(selected: vm.status),
           const SizedBox(height: AppSizes.spaceBtwSections),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const _SectionLabel('Size / Price Variants'),
+              const _SectionLabel(AppStrings.sizeVariantsSection),
               const Text(
-                'Optional',
+                AppStrings.optional,
                 style: TextStyle(
                   fontSize: AppSizes.fontSizeSm,
                   color: AppColors.textSecondary,
@@ -301,7 +310,9 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              wasEditing ? 'Product updated' : 'Product added',
+                              wasEditing
+                                  ? AppStrings.productUpdatedSuccess
+                                  : AppStrings.productAddedSuccess,
                             ),
                           ),
                         );
@@ -324,7 +335,9 @@ class _AddProductViewBodyState extends State<_AddProductViewBody> {
                       ),
                     )
                   : Text(
-                      vm.isEditing ? 'Update Product' : 'Save Product',
+                      vm.isEditing
+                          ? AppStrings.updateProductButton
+                          : AppStrings.saveProductButton,
                       style: const TextStyle(color: AppColors.textWhite),
                     ),
             ),
@@ -381,7 +394,7 @@ class _FinalPriceCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            'Customer Pays',
+            AppStrings.customerPays,
             style: TextStyle(
               fontSize: AppSizes.fontSizeMd,
               color: AppColors.textSecondary,
@@ -391,7 +404,7 @@ class _FinalPriceCard extends StatelessWidget {
             children: [
               if (hasDiscount) ...[
                 Text(
-                  'Rs ${retailPrice.toStringAsFixed(0)}',
+                  '${AppStrings.currencyPrefix}${retailPrice.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: AppSizes.fontSizeSm,
                     color: AppColors.textSecondary,
@@ -401,7 +414,7 @@ class _FinalPriceCard extends StatelessWidget {
                 const SizedBox(width: AppSizes.xs),
               ],
               Text(
-                'Rs ${finalPrice.toStringAsFixed(0)}',
+                '${AppStrings.currencyPrefix}${finalPrice.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: AppSizes.fontSizeLg,
                   fontWeight: FontWeight.bold,
@@ -438,7 +451,7 @@ class _ProfitMarginCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
         ),
         child: const Text(
-          'Enter a cost price to see your profit margin here.',
+          AppStrings.enterCostPriceHint,
           style: TextStyle(
             fontSize: AppSizes.fontSizeSm,
             color: AppColors.textSecondary,
@@ -461,12 +474,12 @@ class _ProfitMarginCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            isLoss ? 'Selling Below Cost' : 'Profit Margin',
+            isLoss ? AppStrings.sellingBelowCost : AppStrings.profitMargin,
             style: TextStyle(fontSize: AppSizes.fontSizeMd, color: color),
           ),
           Text(
-            '${isLoss ? '-' : ''}Rs ${profitMargin!.abs().toStringAsFixed(0)} '
-            'per unit'
+            '${isLoss ? '-' : ''}${AppStrings.currencyPrefix}${profitMargin!.abs().toStringAsFixed(0)} '
+            '${AppStrings.perUnit}'
             '${profitMarginPercentage != null ? ' (${profitMarginPercentage!.abs().toStringAsFixed(0)}%)' : ''}',
             style: TextStyle(
               fontSize: AppSizes.fontSizeMd,
@@ -518,7 +531,7 @@ class _SizesList extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: AppSizes.sm),
         child: Text(
-          'No size variants — product will use the retail price above',
+          AppStrings.noSizeVariantsNote,
           style: TextStyle(color: AppColors.textSecondary),
         ),
       );
@@ -553,9 +566,9 @@ class _SizesList extends StatelessWidget {
               children: [
                 Text(
                   size.hasDiscount
-                      ? 'Rs ${size.price.toStringAsFixed(0)} \u2192 Rs ${size.finalPrice.toStringAsFixed(0)} '
+                      ? '${AppStrings.currencyPrefix}${size.price.toStringAsFixed(0)} \u2192 ${AppStrings.currencyPrefix}${size.finalPrice.toStringAsFixed(0)} '
                             '(${size.discountPercentage.toStringAsFixed(0)}% off)'
-                      : 'Rs ${size.finalPrice.toStringAsFixed(0)}',
+                      : '${AppStrings.currencyPrefix}${size.finalPrice.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: AppSizes.fontSizeSm,
                     color: AppColors.textSecondary,
@@ -565,9 +578,9 @@ class _SizesList extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      'Cost: Rs ${size.costPrice!.toStringAsFixed(0)}'
+                      'Cost: ${AppStrings.currencyPrefix}${size.costPrice!.toStringAsFixed(0)}'
                       ' • ${margin != null && margin < 0 ? "Loss" : "Margin"}: '
-                      'Rs ${margin != null ? margin.abs().toStringAsFixed(0) : "0"}'
+                      '${AppStrings.currencyPrefix}${margin != null ? margin.abs().toStringAsFixed(0) : "0"}'
                       '${marginPct != null ? " (${marginPct.abs().toStringAsFixed(0)}%)" : ""}',
                       style: TextStyle(
                         fontSize: AppSizes.fontSizeSm,
@@ -669,8 +682,8 @@ class _AddSizeFormState extends State<_AddSizeForm> {
             TextField(
               controller: _labelController,
               decoration: const InputDecoration(
-                labelText: 'Size label',
-                hintText: 'e.g. 1 Liter, 5Kg, Dozen',
+                labelText: AppStrings.sizeLabel,
+                hintText: AppStrings.sizeLabelHint,
               ),
             ),
             const SizedBox(height: AppSizes.sm),
@@ -683,8 +696,8 @@ class _AddSizeFormState extends State<_AddSizeForm> {
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Price',
-                      prefixText: 'Rs ',
+                      labelText: AppStrings.priceLabel,
+                      prefixText: AppStrings.currencyPrefix,
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
@@ -697,8 +710,8 @@ class _AddSizeFormState extends State<_AddSizeForm> {
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Discount',
-                      suffixText: '%',
+                      labelText: AppStrings.discountLabel,
+                      suffixText: AppStrings.percentSuffix,
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
@@ -712,9 +725,9 @@ class _AddSizeFormState extends State<_AddSizeForm> {
                 decimal: true,
               ),
               decoration: const InputDecoration(
-                labelText: 'Cost price (optional)',
-                prefixText: 'Rs ',
-                helperText: 'Used to calculate profit margin for this size',
+                labelText: AppStrings.costPriceOptional,
+                prefixText: AppStrings.currencyPrefix,
+                helperText: AppStrings.costPriceHelper,
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -730,7 +743,7 @@ class _AddSizeFormState extends State<_AddSizeForm> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Selling Price: Rs ${previewFinalPrice.toStringAsFixed(0)}',
+                      '${AppStrings.sellingPricePrefix}${previewFinalPrice.toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontSize: AppSizes.fontSizeSm,
                         color: AppColors.primary,
@@ -739,7 +752,7 @@ class _AddSizeFormState extends State<_AddSizeForm> {
                     ),
                     if (previewMargin != null)
                       Text(
-                        'Margin: Rs ${previewMargin.abs().toStringAsFixed(0)}'
+                        '${AppStrings.marginPrefix}${previewMargin.abs().toStringAsFixed(0)}'
                         '${previewMarginPct != null ? " (${previewMarginPct.abs().toStringAsFixed(0)}%)" : ""}',
                         style: TextStyle(
                           fontSize: AppSizes.fontSizeSm,
@@ -760,7 +773,7 @@ class _AddSizeFormState extends State<_AddSizeForm> {
                 onPressed: _handleAdd,
                 icon: const Icon(Icons.add, color: AppColors.secondary),
                 label: const Text(
-                  'Add Size',
+                  AppStrings.addSizeButton,
                   style: TextStyle(color: AppColors.secondary),
                 ),
               ),

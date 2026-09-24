@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'settings_view_model.dart';
@@ -86,7 +87,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
     _syncControllers(vm);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings & Hotel Profile')),
+      appBar: AppBar(title: const Text(AppStrings.settingsTitle)),
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -103,7 +104,9 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 ],
 
                 // ─── Business / Hotel Profile ────────────────────────
-                const _SectionTitle(title: 'Hotel / Business Profile'),
+                const _SectionTitle(
+                  title: AppStrings.hotelBusinessProfileSection,
+                ),
                 const SizedBox(height: AppSizes.sm),
                 _LogoCard(
                   logoPath: vm.logoPath,
@@ -114,7 +117,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 TextField(
                   controller: _hotelNameController,
                   decoration: const InputDecoration(
-                    labelText: 'Hotel / Business Name *',
+                    labelText: AppStrings.hotelBusinessNameLabel,
                     prefixIcon: Icon(Icons.business_outlined),
                   ),
                   onChanged: vm.setHotelName,
@@ -123,7 +126,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 TextField(
                   controller: _taglineController,
                   decoration: const InputDecoration(
-                    labelText: 'Tagline / Slogan',
+                    labelText: AppStrings.taglineLabel,
                     prefixIcon: Icon(Icons.star_outline),
                   ),
                   onChanged: vm.setTagline,
@@ -136,7 +139,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
                         decoration: const InputDecoration(
-                          labelText: 'Contact Phone',
+                          labelText: AppStrings.contactPhoneLabel,
                           prefixIcon: Icon(Icons.phone_outlined),
                         ),
                         onChanged: vm.setPhone,
@@ -148,7 +151,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          labelText: 'Email Address',
+                          labelText: AppStrings.emailAddressLabel,
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
                         onChanged: vm.setEmail,
@@ -161,7 +164,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                   controller: _addressController,
                   maxLines: 2,
                   decoration: const InputDecoration(
-                    labelText: 'Location / Address',
+                    labelText: AppStrings.locationAddressLabel,
                     prefixIcon: Icon(Icons.location_on_outlined),
                   ),
                   onChanged: vm.setAddress,
@@ -170,7 +173,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 TextField(
                   controller: _ntnController,
                   decoration: const InputDecoration(
-                    labelText: 'NTN / Tax Registration No.',
+                    labelText: AppStrings.ntnTaxNumberLabel,
                     prefixIcon: Icon(Icons.pin_outlined),
                   ),
                   onChanged: vm.setNtnOrTaxNumber,
@@ -179,7 +182,9 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 const SizedBox(height: AppSizes.spaceBtwSections),
 
                 // ─── Invoice & Accounting Settings ───────────────────
-                const _SectionTitle(title: 'Invoice & Accounting'),
+                const _SectionTitle(
+                  title: AppStrings.invoiceAndAccountingSection,
+                ),
                 const SizedBox(height: AppSizes.sm),
                 Row(
                   children: [
@@ -188,8 +193,8 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                       child: TextField(
                         controller: _currencyController,
                         decoration: const InputDecoration(
-                          labelText: 'Currency',
-                          hintText: 'Rs, \$, AED',
+                          labelText: AppStrings.currencyLabel,
+                          hintText: AppStrings.currencyHint,
                         ),
                         onChanged: vm.setCurrencySymbol,
                       ),
@@ -204,8 +209,8 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                           decimal: true,
                         ),
                         decoration: const InputDecoration(
-                          labelText: 'Tax Rate (%)',
-                          suffixText: '%',
+                          labelText: AppStrings.taxRateLabel,
+                          suffixText: AppStrings.percentSuffix,
                         ),
                         onChanged: (val) =>
                             vm.setTaxPercentage(double.tryParse(val) ?? 0.0),
@@ -216,10 +221,8 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 const SizedBox(height: AppSizes.xs),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Enable Tax Calculation on Sales'),
-                  subtitle: const Text(
-                    'Automatically compute tax on invoices & receipts',
-                  ),
+                  title: const Text(AppStrings.enableTaxTitle),
+                  subtitle: const Text(AppStrings.enableTaxSubtitle),
                   value: vm.enableTax,
                   activeTrackColor: AppColors.primary,
                   onChanged: vm.setEnableTax,
@@ -229,8 +232,8 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                   controller: _footerNoteController,
                   maxLines: 2,
                   decoration: const InputDecoration(
-                    labelText: 'Invoice Footer Note',
-                    hintText: 'e.g. Thank you for your business! Visit again.',
+                    labelText: AppStrings.invoiceFooterNoteLabel,
+                    hintText: AppStrings.invoiceFooterNoteHint,
                   ),
                   onChanged: vm.setInvoiceFooterNote,
                 ),
@@ -250,7 +253,9 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                             if (success) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Settings saved successfully'),
+                                  content: Text(
+                                    AppStrings.settingsSavedSuccess,
+                                  ),
                                 ),
                               );
                             }
@@ -273,7 +278,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                             ),
                           )
                         : const Text(
-                            'Save Settings',
+                            AppStrings.saveSettingsButton,
                             style: TextStyle(
                               color: AppColors.textWhite,
                               fontWeight: FontWeight.bold,
@@ -354,7 +359,7 @@ class _LogoCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Business Logo',
+                    AppStrings.businessLogoLabel,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -362,7 +367,7 @@ class _LogoCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Used on printed receipts & invoices',
+                    AppStrings.businessLogoHelper,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,
                       color: AppColors.textSecondary,
@@ -378,7 +383,11 @@ class _LogoCard extends StatelessWidget {
               ),
             OutlinedButton(
               onPressed: onPick,
-              child: Text(logoPath != null ? 'Change' : 'Upload'),
+              child: Text(
+                logoPath != null
+                    ? AppStrings.changeButton
+                    : AppStrings.uploadButton,
+              ),
             ),
           ],
         ),

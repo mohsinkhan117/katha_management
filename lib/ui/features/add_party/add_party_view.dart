@@ -1,6 +1,5 @@
-// lib\ui\add_party\add_party_view.dart
-
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/models/party_model.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view_model.dart';
 import 'package:provider/provider.dart';
@@ -12,8 +11,8 @@ class AddPartyView extends StatelessWidget {
   static const String routeName = '/add-party-view';
   static Route route() {
     return MaterialPageRoute(
-      builder: (context) => AddPartyView(),
-      settings: RouteSettings(name: routeName),
+      builder: (context) => const AddPartyView(),
+      settings: const RouteSettings(name: routeName),
     );
   }
 
@@ -57,16 +56,16 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
     final vm = context.watch<AddPartyViewModel>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Party')),
+      appBar: AppBar(title: const Text(AppStrings.addPartyTitle)),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
-          const _SectionLabel('Basic Info'),
+          const _SectionLabel(AppStrings.basicInfoSection),
           const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _nameController,
             decoration: InputDecoration(
-              labelText: 'Party name *',
+              labelText: AppStrings.partyNameLabel,
               suffixIcon: vm.isCheckingDuplicate
                   ? const Padding(
                       padding: EdgeInsets.all(AppSizes.sm),
@@ -107,31 +106,34 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Phone (optional)'),
+            decoration: const InputDecoration(
+              labelText: AppStrings.partyPhoneLabel,
+            ),
             onChanged: (value) =>
                 context.read<AddPartyViewModel>().setPhone(value),
           ),
           const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _addressController,
-            decoration: const InputDecoration(labelText: 'Address (optional)'),
+            decoration: const InputDecoration(
+              labelText: AppStrings.partyAddressLabel,
+            ),
             onChanged: (value) =>
                 context.read<AddPartyViewModel>().setAddress(value),
           ),
           const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel('Category'),
+          const _SectionLabel(AppStrings.categorySection),
           const SizedBox(height: AppSizes.sm),
           _TagSelector(selected: vm.tag),
           const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel('Opening Balance'),
+          const _SectionLabel(AppStrings.openingBalanceSection),
           const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _openingBalanceController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
-              labelText: 'Amount already due (optional)',
-              helperText:
-                  'Use this for balances carried over from before the app',
+              labelText: AppStrings.openingBalanceAmountLabel,
+              helperText: AppStrings.openingBalanceHelper,
             ),
             onChanged: (value) => context
                 .read<AddPartyViewModel>()
@@ -141,7 +143,9 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
           TextField(
             controller: _noteController,
             maxLines: 2,
-            decoration: const InputDecoration(labelText: 'Note (optional)'),
+            decoration: const InputDecoration(
+              labelText: AppStrings.noteOptional,
+            ),
             onChanged: (value) =>
                 context.read<AddPartyViewModel>().setNote(value),
           ),
@@ -165,7 +169,9 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
                       if (!context.mounted) return;
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Party added')),
+                          const SnackBar(
+                            content: Text(AppStrings.partyAddedSuccess),
+                          ),
                         );
                         if (Navigator.canPop(context)) {
                           Navigator.of(context).pop();
@@ -188,7 +194,7 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
                       ),
                     )
                   : const Text(
-                      'Save Party',
+                      AppStrings.savePartyButton,
                       style: TextStyle(color: AppColors.textWhite),
                     ),
             ),

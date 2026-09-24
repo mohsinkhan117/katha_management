@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
 import 'package:katha_management/core/models/party_balance_summary.dart';
 import 'package:katha_management/core/models/party_model.dart';
+import 'package:katha_management/core/models/payment/payment_allocation_model.dart';
 import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/models/sale_model.dart';
 import 'package:katha_management/core/services/party_balance_service.dart';
@@ -123,7 +124,9 @@ class PartyHistoryViewModel extends ChangeNotifier {
             amount: order.totalAmount,
             date: order.orderDate,
             title: 'Order — ${order.status.label}',
-            subtitle: '${order.items.length} items',
+            subtitle: order.advancePaid > 0
+                ? 'Adv: Rs ${order.advancePaid.toStringAsFixed(0)} • ${order.items.length} items'
+                : '${order.items.length} items',
             order: order,
           ),
         ),
@@ -157,6 +160,45 @@ class PartyHistoryViewModel extends ChangeNotifier {
     } catch (e) {
       errorMessage = 'Failed to update order status: $e';
       notifyListeners();
+    }
+  }
+
+  Future<bool> collectPaymentForSale(
+    SaleModel sale,
+    double amount,
+    PaymentMode mode,
+    String? note,
+  ) async {
+    if (amount <= 0) return false;
+    try {
+      final payment = PaymentModel(
+        partyId: sale.partyId,
+        partyName: sale.partyName,
+        partyPhone: sale.partyPhone,
+        amount: amount,
+        mode: mode,
+        note:
+            note ??
+            'Payment for Sale #${sale.id.substring(0, 6).toUpperCase()}',
+      );
+
+      final allocation = PaymentAllocationModel(
+        paymentId: payment.id,
+        saleId: sale.id,
+        amountApplied: amount > sale.balanceDue ? sale.balanceDue : amount,
+      );
+
+      await _paymentRepository.insertPayment(
+        payment,
+        allocations: [allocation],
+      );
+
+      await load();
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to collect payment: $e';
+      notifyListeners();
+      return false;
     }
   }
 

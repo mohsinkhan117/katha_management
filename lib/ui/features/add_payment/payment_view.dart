@@ -1,7 +1,6 @@
-// lib/ui/features/add_payment/payment_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/party_model.dart';
 import 'package:katha_management/core/models/payment/payment_model.dart';
@@ -48,9 +47,11 @@ class _PaymentViewState extends State<PaymentView> {
         title: Consumer<PaymentViewModel>(
           builder: (_, vm, _) {
             if (vm.linkedParty != null) {
-              return Text('Payments - ${vm.linkedParty!.name}');
+              return Text(
+                '${AppStrings.paymentsTitle} - ${vm.linkedParty!.name}',
+              );
             }
-            return const Text('Payments');
+            return const Text(AppStrings.paymentsTitle);
           },
         ),
       ),
@@ -78,7 +79,7 @@ class _PaymentViewState extends State<PaymentView> {
                     height: MediaQuery.of(context).size.height * 0.4,
                     child: const Center(
                       child: Text(
-                        'No payments recorded yet.',
+                        AppStrings.noPaymentsYet,
                         style: TextStyle(color: AppColors.textSecondary),
                       ),
                     ),
@@ -146,7 +147,7 @@ class _PaymentViewState extends State<PaymentView> {
                       ),
                       subtitle: Text(
                         '${payment.mode.label} • ${_formatDate(payment.paymentDate)}'
-                        '${payment.note != null && payment.note!.isNotEmpty ? '\nNote: ${payment.note}' : ''}',
+                        '${payment.note != null && payment.note!.isNotEmpty ? '\n${AppStrings.note}: ${payment.note}' : ''}',
                         style: const TextStyle(
                           fontSize: AppSizes.fontSizeSm,
                           color: AppColors.textSecondary,
@@ -173,7 +174,7 @@ class _PaymentViewState extends State<PaymentView> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openAddPaymentSheet(context),
         icon: const Icon(Icons.add),
-        label: const Text('Record Payment'),
+        label: const Text(AppStrings.recordPaymentButton),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -183,19 +184,17 @@ class _PaymentViewState extends State<PaymentView> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete payment?'),
-        content: const Text(
-          'This will remove the payment and its allocations.',
-        ),
+        title: const Text(AppStrings.deletePaymentTitle),
+        content: const Text(AppStrings.deletePaymentConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text(AppStrings.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
-              'Delete',
+              AppStrings.delete,
               style: TextStyle(color: AppColors.error),
             ),
           ),
@@ -237,7 +236,7 @@ class _PaymentViewState extends State<PaymentView> {
 
     if (context.mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment recorded successfully')),
+        const SnackBar(content: Text(AppStrings.paymentRecordedSuccess)),
       );
     }
   }
@@ -323,7 +322,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Record Payment',
+                AppStrings.recordPaymentButton,
                 style: const TextStyle(
                   fontSize: AppSizes.fontSizeLg,
                   fontWeight: FontWeight.bold,
@@ -359,7 +358,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    subtitle: Text(_selectedParty!.phone ?? 'No phone'),
+                    subtitle: Text(_selectedParty!.phone ?? AppStrings.noPhone),
                     trailing: widget.partyId == null
                         ? IconButton(
                             icon: const Icon(
@@ -382,15 +381,23 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               ] else ...[
                 if (widget.availableParties.isNotEmpty) ...[
                   DropdownButtonFormField<PartyModel>(
+                    isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Select Customer',
+                      labelText: AppStrings.selectCustomer,
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     items: widget.availableParties.map((party) {
+                      final phoneText =
+                          (party.phone != null &&
+                              party.phone!.trim().isNotEmpty)
+                          ? ' (${party.phone!.trim()})'
+                          : '';
                       return DropdownMenuItem<PartyModel>(
                         value: party,
                         child: Text(
-                          '${party.name}${party.phone != null ? ' (${party.phone})' : ''}',
+                          '${party.name}$phoneText',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       );
                     }).toList(),
@@ -409,9 +416,11 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                 ],
                 TextFormField(
                   controller: _partyNameController,
-                  decoration: const InputDecoration(labelText: 'Party name *'),
+                  decoration: const InputDecoration(
+                    labelText: AppStrings.partyNameLabel,
+                  ),
                   validator: (value) => (value == null || value.trim().isEmpty)
-                      ? 'Party name is required'
+                      ? AppStrings.partyNameRequired
                       : null,
                 ),
                 const SizedBox(height: AppSizes.sm),
@@ -420,8 +429,8 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               TextFormField(
                 controller: _amountController,
                 decoration: const InputDecoration(
-                  labelText: 'Amount (Rs) *',
-                  prefixText: 'Rs ',
+                  labelText: AppStrings.amountRequiredLabel,
+                  prefixText: AppStrings.currencyPrefix,
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
@@ -429,20 +438,26 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                 validator: (value) {
                   final parsed = double.tryParse(value ?? '');
                   if (parsed == null || parsed <= 0) {
-                    return 'Enter a valid payment amount';
+                    return AppStrings.enterValidPaymentAmount;
                   }
                   return null;
                 },
               ),
               const SizedBox(height: AppSizes.sm),
               DropdownButtonFormField<PaymentMode>(
+                isExpanded: true,
                 initialValue: _mode,
-                decoration: const InputDecoration(labelText: 'Payment Mode'),
+                decoration: const InputDecoration(
+                  labelText: AppStrings.paymentModeLabel,
+                ),
                 items: PaymentMode.values
                     .map(
                       (mode) => DropdownMenuItem(
                         value: mode,
-                        child: Text(mode.label),
+                        child: Text(
+                          mode.label,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     )
                     .toList(),
@@ -453,7 +468,9 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               const SizedBox(height: AppSizes.sm),
               TextFormField(
                 controller: _noteController,
-                decoration: const InputDecoration(labelText: 'Note (optional)'),
+                decoration: const InputDecoration(
+                  labelText: AppStrings.noteOptional,
+                ),
               ),
               const SizedBox(height: AppSizes.spaceBtwSections),
               SizedBox(
@@ -469,7 +486,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                     ),
                   ),
                   child: const Text(
-                    'Save Payment',
+                    AppStrings.savePaymentButton,
                     style: TextStyle(color: AppColors.textWhite),
                   ),
                 ),

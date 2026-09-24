@@ -16,7 +16,8 @@ class AppDatabase {
   //            `finalPrice` (calculated once, at create/edit time).
   // Version 4: Added costPrice to product_sizes table and created
   //            hotel_profile table for business settings & hotel profile.
-  static const int _dbVersion = 4;
+  // Version 5: Added advancePaid and paymentMode to orders table for advance payment tracking.
+  static const int _dbVersion = 5;
 
   static const String _dbName = 'katha_management.db';
 
@@ -75,6 +76,13 @@ class AppDatabase {
     // ------------------------------------------------------------
     if (oldVersion < 4) {
       await _migrateToVersion4(db);
+    }
+
+    // ------------------------------------------------------------
+    // Version 4 → Version 5
+    // ------------------------------------------------------------
+    if (oldVersion < 5) {
+      await _migrateToVersion5(db);
     }
   }
 
@@ -169,6 +177,8 @@ class AppDatabase {
         expectedDeliveryDate TEXT,
         totalAmount REAL NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'placed',
+        advancePaid REAL NOT NULL DEFAULT 0,
+        paymentMode TEXT NOT NULL DEFAULT 'cash',
         note TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
@@ -446,6 +456,26 @@ class AppDatabase {
       // finalPrice isn't left at its default 0 for existing rows.
       await db.execute(
         'UPDATE $table SET finalPrice = $priceColumn WHERE finalPrice = 0',
+      );
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Migration to Version 5: advancePaid & paymentMode for orders
+  // ------------------------------------------------------------
+
+  Future<void> _migrateToVersion5(Database db) async {
+    final orderCols = await db.rawQuery('PRAGMA table_info(orders)');
+    final colNames = orderCols.map((c) => c['name'] as String).toSet();
+
+    if (!colNames.contains('advancePaid')) {
+      await db.execute(
+        'ALTER TABLE orders ADD COLUMN advancePaid REAL NOT NULL DEFAULT 0',
+      );
+    }
+    if (!colNames.contains('paymentMode')) {
+      await db.execute(
+        "ALTER TABLE orders ADD COLUMN paymentMode TEXT NOT NULL DEFAULT 'cash'",
       );
     }
   }

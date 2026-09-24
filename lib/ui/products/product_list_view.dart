@@ -1,6 +1,5 @@
-// lib/ui/products/product_list_view.dart
-
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:provider/provider.dart';
 
 import 'package:katha_management/core/constants/sizes/sizes.dart';
@@ -37,7 +36,7 @@ class _ProductListViewBody extends StatelessWidget {
     final vm = context.watch<ProductListViewModel>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Products')),
+      appBar: AppBar(title: const Text(AppStrings.productsTitle)),
       body: RefreshIndicator(
         onRefresh: vm.refresh,
         child: Column(
@@ -47,7 +46,7 @@ class _ProductListViewBody extends StatelessWidget {
               child: TextField(
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
-                  hintText: 'Search by name or SKU',
+                  hintText: AppStrings.searchProductsHint,
                 ),
                 onChanged: (value) =>
                     context.read<ProductListViewModel>().setSearchQuery(value),
@@ -63,7 +62,7 @@ class _ProductListViewBody extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: AppSizes.sm),
                       child: ChoiceChip(
-                        label: const Text('All'),
+                        label: const Text(AppStrings.all),
                         selected: vm.categoryFilter == null,
                         onSelected: (_) => context
                             .read<ProductListViewModel>()
@@ -100,7 +99,7 @@ class _ProductListViewBody extends StatelessWidget {
                   : vm.products.isEmpty
                   ? const Center(
                       child: Text(
-                        'No products yet',
+                        AppStrings.noProductsYet,
                         style: TextStyle(color: AppColors.textSecondary),
                       ),
                     )
@@ -124,7 +123,7 @@ class _ProductListViewBody extends StatelessWidget {
           }
         },
         icon: const Icon(Icons.add),
-        label: const Text('Add Product'),
+        label: const Text(AppStrings.addProductTitle),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -214,7 +213,7 @@ class _ProductTile extends StatelessWidget {
             if (product.isLowStock) ...[
               const SizedBox(height: AppSizes.xs),
               const Text(
-                'Low stock',
+                AppStrings.lowStock,
                 style: TextStyle(
                   fontSize: AppSizes.fontSizeSm,
                   color: AppColors.warning,

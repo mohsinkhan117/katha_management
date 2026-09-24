@@ -4,26 +4,31 @@ import 'package:flutter/material.dart';
 import 'package:katha_management/core/models/new_order/new_order_item_model.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
 import 'package:katha_management/core/models/party_model.dart';
+import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/models/product/product_model.dart';
 import 'package:katha_management/core/models/product/product_size_model.dart';
 import 'package:katha_management/features/order/data/repositories/order_repository.dart';
 import 'package:katha_management/features/order/data/repositories/sqflite_order_repository.dart';
 import 'package:katha_management/features/party/data/repositories/party_repository.dart';
 import 'package:katha_management/features/party/data/repositories/sqflite_party_repository.dart';
+import 'package:katha_management/features/payment/data/repositories/payment_repository.dart';
+import 'package:katha_management/features/payment/data/repositories/sqflite_payment_repository.dart';
 import 'package:katha_management/features/product/data/repositories/product_repository.dart';
 import 'package:katha_management/features/product/data/repositories/sqflite_product_repository.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view_model.dart';
 
 /// Drives the New Order form with full product catalog, size variant dropdowns,
-/// mutable prices for special customers, and strict party linking.
+/// mutable prices for special customers, advance payment collection, and strict party linking.
 class NewOrderViewModel extends ChangeNotifier {
   NewOrderViewModel({
     String? initialPartyId,
     OrderRepository? repository,
     PartyRepository? partyRepository,
+    PaymentRepository? paymentRepository,
     ProductRepository? productRepository,
   }) : _repository = repository ?? SqfliteOrderRepository(),
        _partyRepository = partyRepository ?? SqflitePartyRepository(),
+       _paymentRepository = paymentRepository ?? SqflitePaymentRepository(),
        _productRepository = productRepository ?? SqfliteProductRepository(),
        selectedPartyId = initialPartyId {
     _init(initialPartyId);
@@ -31,6 +36,7 @@ class NewOrderViewModel extends ChangeNotifier {
 
   final OrderRepository _repository;
   final PartyRepository _partyRepository;
+  final PaymentRepository _paymentRepository;
   final ProductRepository _productRepository;
 
   // ─── Party details ─────────────────────────────────────────────────
@@ -56,6 +62,8 @@ class NewOrderViewModel extends ChangeNotifier {
   List<OrderItemModel> get customItems => List.unmodifiable(_customItems);
 
   DateTime? expectedDeliveryDate;
+  double advancePaid = 0.0;
+  PaymentMode paymentMode = PaymentMode.cash;
   String? note;
 
   bool isSaving = false;
@@ -78,6 +86,8 @@ class NewOrderViewModel extends ChangeNotifier {
   }
 
   double get totalAmount => items.fold(0, (sum, item) => sum + item.subtotal);
+  double get balanceDue =>
+      (totalAmount - advancePaid).clamp(0.0, double.infinity);
   bool get canSave => partyName.trim().isNotEmpty && items.isNotEmpty;
 
   List<ProductModel> get filteredProducts {
@@ -263,6 +273,16 @@ class NewOrderViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setAdvancePaid(double amount) {
+    advancePaid = amount;
+    notifyListeners();
+  }
+
+  void setPaymentMode(PaymentMode mode) {
+    paymentMode = mode;
+    notifyListeners();
+  }
+
   Future<bool> saveOrder() async {
     if (!canSave) {
       errorMessage = 'Select a party and at least one item before saving.';
@@ -283,6 +303,8 @@ class NewOrderViewModel extends ChangeNotifier {
         expectedDeliveryDate: expectedDeliveryDate,
         items: orderItems,
         status: OrderStatus.placed,
+        advancePaid: advancePaid,
+        paymentMode: paymentMode,
         note: note,
       );
 
@@ -291,6 +313,21 @@ class NewOrderViewModel extends ChangeNotifier {
       );
 
       await _repository.createOrder(finalOrder);
+
+      // Record advance payment to payment repository if advance collected
+      if (advancePaid > 0) {
+        final payment = PaymentModel(
+          partyId: selectedPartyId,
+          partyName: partyName.trim(),
+          partyPhone: partyPhone.trim().isEmpty ? null : partyPhone.trim(),
+          amount: advancePaid,
+          mode: paymentMode,
+          note:
+              'Advance on Order #${finalOrder.id.substring(0, 6).toUpperCase()}${note != null && note!.trim().isNotEmpty ? ' - ${note!.trim()}' : ''}',
+        );
+        await _paymentRepository.insertPayment(payment);
+      }
+
       _resetForm();
       return true;
     } catch (e) {
@@ -308,6 +345,8 @@ class NewOrderViewModel extends ChangeNotifier {
     partyName = '';
     partyPhone = '';
     expectedDeliveryDate = null;
+    advancePaid = 0.0;
+    paymentMode = PaymentMode.cash;
     note = null;
     _selectedItems.clear();
     _customItems.clear();

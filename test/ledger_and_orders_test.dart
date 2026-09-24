@@ -178,6 +178,33 @@ void main() {
       expect(order.itemCount, equals(2));
       // 2 * 250 + (1 * 100 - 10) = 500 + 90 = 590
       expect(order.totalAmount, equals(590.0));
+      expect(order.balanceDue, equals(590.0));
+      expect(order.paymentStatus, equals(OrderPaymentStatus.unpaid));
+    });
+
+    test('OrderModel tracks advancePaid, balanceDue, and paymentStatus', () {
+      final order = OrderModel(
+        partyName: 'Advance Customer',
+        advancePaid: 200,
+        items: [
+          OrderItemModel(
+            orderId: 'o2',
+            productName: 'P1',
+            quantity: 2,
+            unitPrice: 250,
+          ),
+        ],
+      );
+
+      // Total = 500, Advance = 200 => Balance = 300
+      expect(order.totalAmount, equals(500.0));
+      expect(order.advancePaid, equals(200.0));
+      expect(order.balanceDue, equals(300.0));
+      expect(order.paymentStatus, equals(OrderPaymentStatus.partial));
+
+      final fullyPaidOrder = order.copyWith(advancePaid: 500);
+      expect(fullyPaidOrder.balanceDue, equals(0.0));
+      expect(fullyPaidOrder.paymentStatus, equals(OrderPaymentStatus.paid));
     });
   });
 }

@@ -1,7 +1,6 @@
-// lib/ui/navigation_bar/gnav_bar_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/ui/products/product_list_view.dart';
 import 'package:provider/provider.dart';
 
@@ -25,9 +24,7 @@ class GnavBar extends StatelessWidget {
   static const String routeName = '/gnav-bar-view';
   static Route route() {
     return MaterialPageRoute(
-      // builder: (context) => ChangeNotifierProvider(create:(_)=> GnavBarViewModel(),child: _GnavBarBody(),),
-      builder: (context) => GnavBar(),
-
+      builder: (context) => const GnavBar(),
       settings: const RouteSettings(name: routeName),
     );
   }
@@ -89,33 +86,67 @@ class _NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isCompact = screenWidth < 380;
+    final isVeryCompact = screenWidth < 340;
+
     return Container(
-      // decoration: BoxDecoration(
-      //   color: AppColors.accent,
-      //   boxShadow: [
-      //     BoxShadow(blurRadius: 20, color: Colors.black.withValues(alpha: 0.1)),
-      //   ],
-      // ),
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: isVeryCompact ? 6 : (isCompact ? 10 : 16),
+            vertical: 8,
+          ),
           child: GNav(
             rippleColor: Colors.grey[300]!,
             hoverColor: Colors.grey[100]!,
-            gap: 8,
+            gap: isVeryCompact ? 3 : (isCompact ? 5 : 8),
             activeColor: AppColors.primary,
-            iconSize: 24,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            duration: const Duration(milliseconds: 400),
-            tabBackgroundColor: Colors.grey[100]!,
+            iconSize: isVeryCompact ? 18 : (isCompact ? 20 : 22),
+            textStyle: TextStyle(
+              fontSize: isVeryCompact ? 11 : (isCompact ? 12 : 13),
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: isVeryCompact ? 8 : (isCompact ? 10 : 14),
+              vertical: isVeryCompact ? 6 : 8,
+            ),
+            duration: const Duration(milliseconds: 300),
+            tabBackgroundColor: AppColors.primary.withValues(alpha: 0.1),
             color: AppColors.textSecondary,
             selectedIndex: selectedIndex,
             onTabChange: onTabChange,
-            tabs: const [
-              GButton(icon: Icons.dashboard, text: 'Dashboard'),
-              GButton(icon: Icons.receipt, text: 'Orders'),
-              GButton(icon: Icons.people, text: 'Customers'),
-              GButton(icon: Icons.production_quantity_limits, text: 'Products'),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            tabs: [
+              GButton(
+                icon: Icons.dashboard_outlined,
+                text: isCompact ? AppStrings.navHome : AppStrings.navDashboard,
+              ),
+              const GButton(
+                icon: Icons.receipt_long_outlined,
+                text: AppStrings.navOrders,
+              ),
+              GButton(
+                icon: Icons.people_outline,
+                text: isCompact
+                    ? AppStrings.navParties
+                    : AppStrings.navCustomers,
+              ),
+              const GButton(
+                icon: Icons.inventory_2_outlined,
+                text: AppStrings.navProducts,
+              ),
             ],
           ),
         ),

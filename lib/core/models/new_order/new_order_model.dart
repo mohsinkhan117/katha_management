@@ -1,9 +1,25 @@
 // lib/core/models/new_order/new_order_model.dart
 
 import 'package:katha_management/core/models/new_order/new_order_item_model.dart';
+import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:uuid/uuid.dart';
 
 enum OrderStatus { placed, confirmed, dispatched, delivered, cancelled }
+
+enum OrderPaymentStatus { unpaid, partial, paid }
+
+extension OrderPaymentStatusX on OrderPaymentStatus {
+  String get label {
+    switch (this) {
+      case OrderPaymentStatus.unpaid:
+        return 'Unpaid';
+      case OrderPaymentStatus.partial:
+        return 'Partial Advance';
+      case OrderPaymentStatus.paid:
+        return 'Fully Paid';
+    }
+  }
+}
 
 extension OrderStatusX on OrderStatus {
   String get value => name;
@@ -53,9 +69,8 @@ extension OrderStatusX on OrderStatus {
 /// An order placed by a party, tracked through
 /// placed → confirmed → dispatched → delivered (or cancelled).
 ///
-/// An Order carries no payment — it's a commitment, not a transaction.
-/// Once delivered, it's expected to be converted into a Sale/Invoice
-/// (see the Sale module), which is where money actually changes hands.
+/// Supports advance payments collected at order time. Once delivered,
+/// it's converted into a Sale/Invoice with advance payments cleanly carried over.
 class OrderModel {
   final String id;
   final String? partyId;
@@ -65,11 +80,11 @@ class OrderModel {
   final DateTime? expectedDeliveryDate;
   final List<OrderItemModel> items;
   final OrderStatus status;
+  final double advancePaid;
+  final PaymentMode paymentMode;
   final String? note;
   final DateTime createdAt;
-  final DateTime updatedAt; 
-  // also add deliveredAt;
-  // payment status;  payment promised date
+  final DateTime updatedAt;
   final bool isSynced;
 
   /// Set once this order has produced a Sale via `convertToSale()`.
@@ -87,6 +102,8 @@ class OrderModel {
     this.expectedDeliveryDate,
     required this.items,
     this.status = OrderStatus.placed,
+    this.advancePaid = 0.0,
+    this.paymentMode = PaymentMode.cash,
     this.note,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -100,6 +117,17 @@ class OrderModel {
   double get totalAmount => items.fold(0, (sum, item) => sum + item.subtotal);
   int get itemCount => items.length;
 
+  double get balanceDue =>
+      (totalAmount - advancePaid).clamp(0.0, double.infinity);
+
+  OrderPaymentStatus get paymentStatus {
+    if (advancePaid <= 0) return OrderPaymentStatus.unpaid;
+    if (advancePaid >= totalAmount && totalAmount > 0) {
+      return OrderPaymentStatus.paid;
+    }
+    return OrderPaymentStatus.partial;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -110,6 +138,8 @@ class OrderModel {
       'expectedDeliveryDate': expectedDeliveryDate?.toIso8601String(),
       'totalAmount': totalAmount,
       'status': status.value,
+      'advancePaid': advancePaid,
+      'paymentMode': paymentMode.value,
       'note': note,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -135,6 +165,10 @@ class OrderModel {
           : null,
       items: items,
       status: OrderStatusX.fromString(map['status'] as String),
+      advancePaid: (map['advancePaid'] as num?)?.toDouble() ?? 0.0,
+      paymentMode: map['paymentMode'] != null
+          ? PaymentModeX.fromString(map['paymentMode'] as String)
+          : PaymentMode.cash,
       note: map['note'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
@@ -151,6 +185,8 @@ class OrderModel {
     DateTime? expectedDeliveryDate,
     List<OrderItemModel>? items,
     OrderStatus? status,
+    double? advancePaid,
+    PaymentMode? paymentMode,
     String? note,
     bool? isSynced,
     String? convertedSaleId,
@@ -164,6 +200,8 @@ class OrderModel {
       expectedDeliveryDate: expectedDeliveryDate ?? this.expectedDeliveryDate,
       items: items ?? this.items,
       status: status ?? this.status,
+      advancePaid: advancePaid ?? this.advancePaid,
+      paymentMode: paymentMode ?? this.paymentMode,
       note: note ?? this.note,
       createdAt: createdAt,
       updatedAt: DateTime.now(),

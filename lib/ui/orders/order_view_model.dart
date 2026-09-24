@@ -2,10 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
+import 'package:katha_management/core/models/payment/payment_allocation_model.dart';
+import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/models/sale_item_model.dart';
 import 'package:katha_management/core/models/sale_model.dart';
 import 'package:katha_management/features/order/data/repositories/order_repository.dart';
 import 'package:katha_management/features/order/data/repositories/sqflite_order_repository.dart';
+import 'package:katha_management/features/payment/data/repositories/payment_repository.dart';
+import 'package:katha_management/features/payment/data/repositories/sqflite_payment_repository.dart';
 import 'package:katha_management/features/sale/data/repositories/sale_repository.dart';
 import 'package:katha_management/features/sale/data/repositories/sqflite_sale_repository.dart';
 
@@ -13,19 +17,22 @@ import 'package:katha_management/features/sale/data/repositories/sqflite_sale_re
 ///
 /// Categorizes orders into Pending (placed, confirmed, dispatched)
 /// and Done (delivered, cancelled), and allows advancing lifecycle
-/// status, searching, cancelling, or converting delivered orders into
+/// status, collecting payments, cancelling, or converting delivered orders into
 /// sales.
 class OrderViewModel extends ChangeNotifier {
   OrderViewModel({
     OrderRepository? orderRepository,
     SaleRepository? saleRepository,
+    PaymentRepository? paymentRepository,
   }) : _orderRepository = orderRepository ?? SqfliteOrderRepository(),
-       _saleRepository = saleRepository ?? SqfliteSaleRepository() {
+       _saleRepository = saleRepository ?? SqfliteSaleRepository(),
+       _paymentRepository = paymentRepository ?? SqflitePaymentRepository() {
     loadOrders();
   }
 
   final OrderRepository _orderRepository;
   final SaleRepository _saleRepository;
+  final PaymentRepository _paymentRepository;
 
   List<OrderModel> _allOrders = [];
   bool _isLoading = false;
@@ -137,6 +144,43 @@ class OrderViewModel extends ChangeNotifier {
     }
   }
 
+  /// Records payment received directly against an order and updates advance balance.
+  Future<bool> recordOrderPayment(
+    OrderModel order,
+    double amount,
+    PaymentMode mode,
+    String? note,
+  ) async {
+    if (amount <= 0) return false;
+
+    try {
+      final payment = PaymentModel(
+        partyId: order.partyId,
+        partyName: order.partyName,
+        partyPhone: order.partyPhone,
+        amount: amount,
+        mode: mode,
+        note:
+            note ??
+            'Payment collected on Order #${order.id.substring(0, 6).toUpperCase()}',
+      );
+
+      await _paymentRepository.insertPayment(payment);
+
+      final updatedOrder = order.copyWith(
+        advancePaid: order.advancePaid + amount,
+      );
+      await _orderRepository.updateOrder(updatedOrder);
+
+      await loadOrders();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to record payment: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Converts an order into a Sale/Invoice.
   ///
   /// Guarded by `order.convertedSaleId`: once an order has produced a
@@ -170,6 +214,7 @@ class OrderViewModel extends ChangeNotifier {
         partyName: order.partyName,
         partyPhone: order.partyPhone,
         items: saleItems,
+        paidAmount: order.advancePaid,
         note:
             'Converted from Order #${order.id.substring(0, 6).toUpperCase()}${order.note != null ? ' - ${order.note}' : ''}',
       );
@@ -179,6 +224,31 @@ class OrderViewModel extends ChangeNotifier {
       );
 
       await _saleRepository.createSale(finalSale);
+
+      // If there was an advance payment on the order, allocate it to the generated sale
+      if (order.advancePaid > 0) {
+        final payment = PaymentModel(
+          partyId: order.partyId,
+          partyName: order.partyName,
+          partyPhone: order.partyPhone,
+          amount: order.advancePaid,
+          mode: order.paymentMode,
+          note: 'Advance on Order #${order.id.substring(0, 6).toUpperCase()}',
+        );
+
+        final allocation = PaymentAllocationModel(
+          paymentId: payment.id,
+          saleId: finalSale.id,
+          amountApplied: order.advancePaid > finalSale.totalAmount
+              ? finalSale.totalAmount
+              : order.advancePaid,
+        );
+
+        await _paymentRepository.insertPayment(
+          payment,
+          allocations: [allocation],
+        );
+      }
 
       // Status and the conversion link are written together in one
       // update — if these were two separate repository calls, a
