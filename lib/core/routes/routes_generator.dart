@@ -53,6 +53,7 @@ class RouterGenerator {
         return NewOrderView.route(partyId: partyId);
 
       case PaymentView.routeName:
+      case '/payment-view':
         final partyId = settings.arguments as String?;
         return PaymentView.route(partyId: partyId);
 

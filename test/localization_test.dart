@@ -62,7 +62,9 @@ void main() {
 
   group('AppLocalizations & AppStrings Tests', () {
     test('Supported locales include English and Urdu', () {
-      final locales = AppLocalizations.supportedLocales.map((l) => l.languageCode).toList();
+      final locales = AppLocalizations.supportedLocales
+          .map((l) => l.languageCode)
+          .toList();
       expect(locales, containsAll(['en', 'ur']));
     });
 
@@ -75,14 +77,20 @@ void main() {
       expect(AppStrings.appTitle, equals('Katha Management'));
       expect(AppStrings.dashboardTitle, equals('Dashboard'));
       expect(AppStrings.todaysSales, equals("Today's Sales"));
-      expect(AppStrings.openingBalanceLabel, equals('Previous Due (Opening Balance)'));
+      expect(
+        AppStrings.openingBalanceLabel,
+        equals('Previous Due (Opening Balance)'),
+      );
 
       // In Urdu
       AppStrings.updateLocale(urLoc);
       expect(AppStrings.appTitle, equals('کھاتہ مینجمنٹ'));
       expect(AppStrings.dashboardTitle, equals('ڈیش بورڈ'));
       expect(AppStrings.todaysSales, equals('آج کی فروخت'));
-      expect(AppStrings.openingBalanceLabel, equals('پچھلا بقایا (اوپننگ بیلنس)'));
+      expect(
+        AppStrings.openingBalanceLabel,
+        equals('پچھلا بقایا (اوپننگ بیلنس)'),
+      );
       expect(AppStrings.quickActionAddPayment, equals('ادائیگی درج کریں'));
     });
 
@@ -102,17 +110,22 @@ void main() {
       final missingInUrdu = enKeys.difference(urKeys);
       final missingInEnglish = urKeys.difference(enKeys);
 
-      expect(missingInUrdu, isEmpty,
-          reason: 'Keys present in English but missing in Urdu: $missingInUrdu');
-      expect(missingInEnglish, isEmpty,
-          reason: 'Keys present in Urdu but missing in English: $missingInEnglish');
+      expect(
+        missingInUrdu,
+        isEmpty,
+        reason: 'Keys present in English but missing in Urdu: $missingInUrdu',
+      );
+      expect(
+        missingInEnglish,
+        isEmpty,
+        reason:
+            'Keys present in Urdu but missing in English: $missingInEnglish',
+      );
     });
   });
 
   group('Widget Directionality & RTL Tests', () {
     testWidgets('App renders LTR for English and RTL for Urdu', (tester) async {
-      final localeProvider = LocaleProvider();
-
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
@@ -121,9 +134,7 @@ void main() {
           home: Builder(
             builder: (context) {
               final direction = Directionality.of(context);
-              return Scaffold(
-                body: Text('Direction: $direction'),
-              );
+              return Scaffold(body: Text('Direction: $direction'));
             },
           ),
         ),
@@ -141,9 +152,7 @@ void main() {
           home: Builder(
             builder: (context) {
               final direction = Directionality.of(context);
-              return Scaffold(
-                body: Text('Direction: $direction'),
-              );
+              return Scaffold(body: Text('Direction: $direction'));
             },
           ),
         ),
@@ -154,4 +163,3 @@ void main() {
     });
   });
 }
-

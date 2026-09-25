@@ -7,14 +7,18 @@ import 'package:katha_management/core/providers/locale_provider.dart';
 import 'package:katha_management/core/routes/routes_generator.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
 import 'package:katha_management/l10n/app_localizations.dart';
+import 'package:katha_management/ui/features/add_payment/payment_view_model.dart';
 import 'package:katha_management/ui/navigation_bar/gnav_bar_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => LocaleProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider(create: (_) => PaymentViewModel()),
+      ],
       child: const MyApp(),
     ),
   );

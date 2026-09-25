@@ -8,7 +8,7 @@ import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view_model.dart';
 import 'package:provider/provider.dart';
 
-class PaymentView extends StatefulWidget {
+class PaymentView extends StatelessWidget {
   static const String routeName = '/payment_view';
   static Route route({String? partyId}) {
     return MaterialPageRoute(
@@ -24,10 +24,27 @@ class PaymentView extends StatefulWidget {
   final String? partyId;
 
   @override
-  State<PaymentView> createState() => _PaymentViewState();
+  Widget build(BuildContext context) {
+    final routeArgs = ModalRoute.of(context)?.settings.arguments;
+    final effectivePartyId =
+        partyId ?? (routeArgs is String ? routeArgs : null);
+
+    return ChangeNotifierProvider(
+      create: (_) => PaymentViewModel(),
+      child: _PaymentViewBody(partyId: effectivePartyId),
+    );
+  }
 }
 
-class _PaymentViewState extends State<PaymentView> {
+class _PaymentViewBody extends StatefulWidget {
+  const _PaymentViewBody({this.partyId});
+  final String? partyId;
+
+  @override
+  State<_PaymentViewBody> createState() => _PaymentViewBodyState();
+}
+
+class _PaymentViewBodyState extends State<_PaymentViewBody> {
   @override
   void initState() {
     super.initState();
@@ -468,9 +485,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               const SizedBox(height: AppSizes.sm),
               TextFormField(
                 controller: _noteController,
-                decoration: InputDecoration(
-                  labelText: AppStrings.noteOptional,
-                ),
+                decoration: InputDecoration(labelText: AppStrings.noteOptional),
               ),
               const SizedBox(height: AppSizes.spaceBtwSections),
               SizedBox(
