@@ -1,6 +1,7 @@
 // lib/ui/features/new_order/new_order_view_model.dart
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/models/new_order/new_order_item_model.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
 import 'package:katha_management/core/models/party_model.dart';
@@ -17,11 +18,12 @@ import 'package:katha_management/features/product/data/repositories/product_repo
 import 'package:katha_management/features/product/data/repositories/sqflite_product_repository.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view_model.dart';
 
-/// Drives the New Order form with full product catalog, size variant dropdowns,
+/// Drives the New / Edit Order form with full product catalog, size variant dropdowns,
 /// mutable prices for special customers, advance payment collection, and strict party linking.
 class NewOrderViewModel extends ChangeNotifier {
   NewOrderViewModel({
     String? initialPartyId,
+    OrderModel? orderToEdit,
     OrderRepository? repository,
     PartyRepository? partyRepository,
     PaymentRepository? paymentRepository,
@@ -30,14 +32,32 @@ class NewOrderViewModel extends ChangeNotifier {
        _partyRepository = partyRepository ?? SqflitePartyRepository(),
        _paymentRepository = paymentRepository ?? SqflitePaymentRepository(),
        _productRepository = productRepository ?? SqfliteProductRepository(),
-       selectedPartyId = initialPartyId {
-    _init(initialPartyId);
+       _orderToEdit = orderToEdit,
+       selectedPartyId = orderToEdit?.partyId ?? initialPartyId {
+    if (orderToEdit != null) {
+      partyName = orderToEdit.partyName;
+      partyPhone = orderToEdit.partyPhone ?? '';
+      expectedDeliveryDate = orderToEdit.expectedDeliveryDate;
+      advancePaid = orderToEdit.advancePaid;
+      paymentMode = orderToEdit.paymentMode;
+      note = orderToEdit.note;
+      _customItems.addAll(orderToEdit.items);
+    }
+    _init(selectedPartyId);
   }
 
   final OrderRepository _repository;
   final PartyRepository _partyRepository;
   final PaymentRepository _paymentRepository;
   final ProductRepository _productRepository;
+  final OrderModel? _orderToEdit;
+
+  bool get isEditing => _orderToEdit != null;
+  OrderModel? get orderToEdit => _orderToEdit;
+  bool get canEdit {
+    final order = _orderToEdit;
+    return order == null || order.status == OrderStatus.placed;
+  }
 
   // ─── Party details ─────────────────────────────────────────────────
   String? selectedPartyId;
@@ -290,16 +310,72 @@ class NewOrderViewModel extends ChangeNotifier {
       return false;
     }
 
+    if (!canEdit) {
+      errorMessage = AppStrings.cannotEditDeliveredOrPaidOrder;
+      notifyListeners();
+      return false;
+    }
+
     isSaving = true;
     errorMessage = null;
     notifyListeners();
 
     try {
+      String? effectivePartyId = selectedPartyId;
+      final cleanPartyName = partyName.trim();
+      final cleanPartyPhone = partyPhone.trim().isEmpty
+          ? null
+          : partyPhone.trim();
+
+      // Auto-create party if entered on-the-fly and not already existing
+      if (effectivePartyId == null && cleanPartyName.isNotEmpty) {
+        final existingParties = await _partyRepository.searchParties(
+          cleanPartyName,
+        );
+        final exactMatch = existingParties
+            .where(
+              (p) =>
+                  p.name.trim().toLowerCase() == cleanPartyName.toLowerCase(),
+            )
+            .firstOrNull;
+
+        if (exactMatch != null) {
+          effectivePartyId = exactMatch.id;
+        } else {
+          final newParty = PartyModel(
+            name: cleanPartyName,
+            phone: cleanPartyPhone,
+          );
+          await _partyRepository.createParty(newParty);
+          effectivePartyId = newParty.id;
+        }
+      }
+
       final orderItems = items;
+
+      if (isEditing) {
+        final orderToUpdate = _orderToEdit!;
+        final updatedOrder = orderToUpdate.copyWith(
+          partyId: effectivePartyId,
+          partyName: cleanPartyName,
+          partyPhone: cleanPartyPhone,
+          expectedDeliveryDate: expectedDeliveryDate,
+          items: orderItems
+              .map((item) => item.attachToOrder(orderToUpdate.id))
+              .toList(),
+          advancePaid: advancePaid,
+          paymentMode: paymentMode,
+          note: note,
+        );
+
+        await _repository.updateOrder(updatedOrder);
+        return true;
+      }
+
       final order = OrderModel(
-        partyId: selectedPartyId,
-        partyName: partyName.trim(),
-        partyPhone: partyPhone.trim().isEmpty ? null : partyPhone.trim(),
+        partyId: effectivePartyId,
+        partyName: cleanPartyName,
+        partyPhone: cleanPartyPhone,
         expectedDeliveryDate: expectedDeliveryDate,
         items: orderItems,
         status: OrderStatus.placed,
@@ -317,9 +393,9 @@ class NewOrderViewModel extends ChangeNotifier {
       // Record advance payment to payment repository if advance collected
       if (advancePaid > 0) {
         final payment = PaymentModel(
-          partyId: selectedPartyId,
-          partyName: partyName.trim(),
-          partyPhone: partyPhone.trim().isEmpty ? null : partyPhone.trim(),
+          partyId: effectivePartyId,
+          partyName: cleanPartyName,
+          partyPhone: cleanPartyPhone,
           amount: advancePaid,
           mode: paymentMode,
           note:
@@ -332,6 +408,30 @@ class NewOrderViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       errorMessage = 'Failed to save order: $e';
+      return false;
+    } finally {
+      isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteOrder() async {
+    final order = _orderToEdit;
+    if (order == null) return false;
+    if (order.status != OrderStatus.placed) {
+      errorMessage = AppStrings.cannotEditDeliveredOrPaidOrder;
+      notifyListeners();
+      return false;
+    }
+    isSaving = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteOrder(order.id);
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to delete order: $e';
       return false;
     } finally {
       isSaving = false;

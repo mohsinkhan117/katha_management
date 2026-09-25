@@ -9,19 +9,23 @@ import '../../../../core/theme/app_colors/app_colors.dart';
 
 class AddPartyView extends StatelessWidget {
   static const String routeName = '/add-party-view';
-  static Route route() {
+  static Route route({PartyModel? partyToEdit}) {
     return MaterialPageRoute(
-      builder: (context) => const AddPartyView(),
-      settings: const RouteSettings(name: routeName),
+      builder: (context) => AddPartyView(partyToEdit: partyToEdit),
+      settings: RouteSettings(name: routeName, arguments: partyToEdit),
     );
   }
 
-  const AddPartyView({super.key});
+  const AddPartyView({super.key, this.partyToEdit});
+  final PartyModel? partyToEdit;
 
   @override
   Widget build(BuildContext context) {
+    final party =
+        partyToEdit ??
+        (ModalRoute.of(context)?.settings.arguments as PartyModel?);
     return ChangeNotifierProvider(
-      create: (_) => AddPartyViewModel(),
+      create: (_) => AddPartyViewModel(partyToEdit: party),
       child: const _AddPartyViewBody(),
     );
   }
@@ -42,6 +46,21 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
   final _noteController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    final vm = context.read<AddPartyViewModel>();
+    if (vm.isEditing) {
+      _nameController.text = vm.name;
+      _phoneController.text = vm.phone;
+      _addressController.text = vm.address;
+      if (vm.openingBalance > 0) {
+        _openingBalanceController.text = vm.openingBalance.toStringAsFixed(0);
+      }
+      _noteController.text = vm.note ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
@@ -56,7 +75,54 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
     final vm = context.watch<AddPartyViewModel>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.addPartyTitle)),
+      appBar: AppBar(
+        title: Text(
+          vm.isEditing ? AppStrings.editPartyTitle : AppStrings.addPartyTitle,
+        ),
+        actions: [
+          if (vm.isEditing)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: AppStrings.deletePartyButton,
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text(AppStrings.deletePartyTitle),
+                    content: const Text(AppStrings.deletePartyMessage),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text(AppStrings.no),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                        ),
+                        child: const Text(AppStrings.deletePartyButton),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  final partyVm = context.read<AddPartyViewModel>();
+                  final deleted = await partyVm.deleteParty();
+                  if (deleted && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(AppStrings.partyDeletedSuccess),
+                      ),
+                    );
+                    if (Navigator.canPop(context)) {
+                      Navigator.of(context).pop(true);
+                    }
+                  }
+                }
+              },
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
@@ -169,12 +235,16 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
                       if (!context.mounted) return;
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(AppStrings.partyAddedSuccess),
+                          SnackBar(
+                            content: Text(
+                              partyVm.isEditing
+                                  ? AppStrings.partyUpdatedSuccess
+                                  : AppStrings.partyAddedSuccess,
+                            ),
                           ),
                         );
                         if (Navigator.canPop(context)) {
-                          Navigator.of(context).pop();
+                          Navigator.of(context).pop(true);
                         }
                       }
                     },
@@ -193,9 +263,11 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
                         color: AppColors.textWhite,
                       ),
                     )
-                  : const Text(
-                      AppStrings.savePartyButton,
-                      style: TextStyle(color: AppColors.textWhite),
+                  : Text(
+                      vm.isEditing
+                          ? AppStrings.updatePartyButton
+                          : AppStrings.savePartyButton,
+                      style: const TextStyle(color: AppColors.textWhite),
                     ),
             ),
           ),

@@ -39,8 +39,19 @@ class PartyReportPdfService {
     final totalPayments = payments.fold(0.0, (sum, p) => sum + p.amount);
     final balanceDue = balance?.balanceDue ?? 0.0;
     final totalOrders = orders.length;
-    final pendingOrders = orders.where((o) => o.status != OrderStatus.delivered).length;
-    final deliveredOrders = orders.where((o) => o.status == OrderStatus.delivered).length;
+    final pendingOrders = orders
+        .where(
+          (o) =>
+              o.status == OrderStatus.placed ||
+              o.status == OrderStatus.delivered,
+        )
+        .length;
+    final deliveredOrders = orders
+        .where(
+          (o) =>
+              o.status == OrderStatus.delivered || o.status == OrderStatus.paid,
+        )
+        .length;
 
     pdf.addPage(
       pw.MultiPage(
@@ -94,7 +105,8 @@ class PartyReportPdfService {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => bytes,
-      name: 'Statement_${party.name.replaceAll(' ', '_')}_${_dateFormat.format(DateTime.now())}.pdf',
+      name:
+          'Statement_${party.name.replaceAll(' ', '_')}_${_dateFormat.format(DateTime.now())}.pdf',
     );
   }
 
@@ -118,7 +130,8 @@ class PartyReportPdfService {
 
     await Printing.sharePdf(
       bytes: bytes,
-      filename: 'Statement_${party.name.replaceAll(' ', '_')}_${_dateFormat.format(DateTime.now())}.pdf',
+      filename:
+          'Statement_${party.name.replaceAll(' ', '_')}_${_dateFormat.format(DateTime.now())}.pdf',
     );
   }
 
@@ -140,7 +153,9 @@ class PartyReportPdfService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                profile.hotelName.isNotEmpty ? profile.hotelName : 'KATHA MANAGEMENT',
+                profile.hotelName.isNotEmpty
+                    ? profile.hotelName
+                    : 'KATHA MANAGEMENT',
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
@@ -150,17 +165,26 @@ class PartyReportPdfService {
               if (profile.tagline != null && profile.tagline!.isNotEmpty)
                 pw.Text(
                   profile.tagline!,
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey700,
+                  ),
                 ),
               if (profile.phone != null && profile.phone!.isNotEmpty)
                 pw.Text(
                   'Phone: ${profile.phone!}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey700,
+                  ),
                 ),
               if (profile.address != null && profile.address!.isNotEmpty)
                 pw.Text(
                   profile.address!,
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey700,
+                  ),
                 ),
             ],
           ),
@@ -168,7 +192,10 @@ class PartyReportPdfService {
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
                 decoration: pw.BoxDecoration(
                   color: PdfColors.blueGrey800,
                   borderRadius: pw.BorderRadius.circular(4),
@@ -185,7 +212,10 @@ class PartyReportPdfService {
               pw.SizedBox(height: 4),
               pw.Text(
                 'Date: ${_dateTimeFormat.format(DateTime.now())}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey700,
+                ),
               ),
             ],
           ),
@@ -260,12 +290,29 @@ class PartyReportPdfService {
               if (party.phone != null && party.phone!.isNotEmpty)
                 pw.Text(
                   'Phone: ${party.phone!}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey800,
+                  ),
                 ),
               if (party.address != null && party.address!.isNotEmpty)
                 pw.Text(
                   'Address: ${party.address!}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey800,
+                  ),
+                ),
+              if (party.openingBalance > 0)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 2),
+                  child: pw.Text(
+                    'Previous Due (Opening Balance): $currency ${party.openingBalance.toStringAsFixed(0)}',
+                    style: const pw.TextStyle(
+                      fontSize: 8,
+                      color: PdfColors.red800,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -323,11 +370,21 @@ class PartyReportPdfService {
         pw.Row(
           children: [
             pw.Expanded(
-              child: _buildSummaryBox('TOTAL SALES', '$currency ${totalSales.toStringAsFixed(0)}', PdfColors.blue50, PdfColors.blue900),
+              child: _buildSummaryBox(
+                'TOTAL SALES',
+                '$currency ${totalSales.toStringAsFixed(0)}',
+                PdfColors.blue50,
+                PdfColors.blue900,
+              ),
             ),
             pw.SizedBox(width: 8),
             pw.Expanded(
-              child: _buildSummaryBox('TOTAL PAYMENTS', '$currency ${totalPayments.toStringAsFixed(0)}', PdfColors.green50, PdfColors.green900),
+              child: _buildSummaryBox(
+                'TOTAL PAYMENTS',
+                '$currency ${totalPayments.toStringAsFixed(0)}',
+                PdfColors.green50,
+                PdfColors.green900,
+              ),
             ),
             pw.SizedBox(width: 8),
             pw.Expanded(
@@ -340,7 +397,12 @@ class PartyReportPdfService {
             ),
             pw.SizedBox(width: 8),
             pw.Expanded(
-              child: _buildSummaryBox('ORDERS ($totalOrders)', '$pendingOrders Pending / $deliveredOrders Done', PdfColors.purple50, PdfColors.purple900),
+              child: _buildSummaryBox(
+                'ORDERS ($totalOrders)',
+                '$pendingOrders Pending / $deliveredOrders Done',
+                PdfColors.purple50,
+                PdfColors.purple900,
+              ),
             ),
           ],
         ),
@@ -367,7 +429,12 @@ class PartyReportPdfService {
     );
   }
 
-  static pw.Widget _buildSummaryBox(String title, String value, PdfColor bg, PdfColor textColor) {
+  static pw.Widget _buildSummaryBox(
+    String title,
+    String value,
+    PdfColor bg,
+    PdfColor textColor,
+  ) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(6),
       decoration: pw.BoxDecoration(
@@ -380,12 +447,20 @@ class PartyReportPdfService {
         children: [
           pw.Text(
             title,
-            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: textColor),
+            style: pw.TextStyle(
+              fontSize: 7,
+              fontWeight: pw.FontWeight.bold,
+              color: textColor,
+            ),
           ),
           pw.SizedBox(height: 2),
           pw.Text(
             value,
-            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: textColor),
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+              color: textColor,
+            ),
           ),
         ],
       ),
@@ -393,7 +468,10 @@ class PartyReportPdfService {
   }
 
   // ─── Orders History Table & Item Breakdown ─────────────────────────
-  static pw.Widget _buildOrdersSection(List<OrderModel> orders, String currency) {
+  static pw.Widget _buildOrdersSection(
+    List<OrderModel> orders,
+    String currency,
+  ) {
     if (orders.isEmpty) {
       return pw.Container(
         padding: const pw.EdgeInsets.all(8),
@@ -459,18 +537,27 @@ class PartyReportPdfService {
                   children: [
                     pw.Text(
                       'Order #${order.id.length > 8 ? order.id.substring(0, 8) : order.id}',
-                      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                      style: pw.TextStyle(
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
                     ),
                     pw.SizedBox(width: 8),
                     pw.Text(
                       'Date: ${_dateFormat.format(order.orderDate)}',
-                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
+                      style: const pw.TextStyle(
+                        fontSize: 8,
+                        color: PdfColors.grey800,
+                      ),
                     ),
                     if (order.expectedDeliveryDate != null) ...[
                       pw.SizedBox(width: 8),
                       pw.Text(
                         'Delivery: ${_dateFormat.format(order.expectedDeliveryDate!)}',
-                        style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
+                        style: const pw.TextStyle(
+                          fontSize: 8,
+                          color: PdfColors.grey800,
+                        ),
                       ),
                     ],
                   ],
@@ -478,16 +565,27 @@ class PartyReportPdfService {
                 pw.Row(
                   children: [
                     pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: pw.BoxDecoration(
-                        color: order.status == OrderStatus.delivered
+                        color: order.status == OrderStatus.paid
                             ? PdfColors.green100
-                            : PdfColors.orange100,
+                            : (order.status == OrderStatus.delivered
+                                  ? PdfColors.amber100
+                                  : (order.status == OrderStatus.cancelled
+                                        ? PdfColors.red100
+                                        : PdfColors.blue100)),
                         borderRadius: pw.BorderRadius.circular(3),
                         border: pw.Border.all(
-                          color: order.status == OrderStatus.delivered
+                          color: order.status == OrderStatus.paid
                               ? PdfColors.green400
-                              : PdfColors.orange400,
+                              : (order.status == OrderStatus.delivered
+                                    ? PdfColors.amber400
+                                    : (order.status == OrderStatus.cancelled
+                                          ? PdfColors.red400
+                                          : PdfColors.blue400)),
                           width: 0.5,
                         ),
                       ),
@@ -496,9 +594,13 @@ class PartyReportPdfService {
                         style: pw.TextStyle(
                           fontSize: 7,
                           fontWeight: pw.FontWeight.bold,
-                          color: order.status == OrderStatus.delivered
+                          color: order.status == OrderStatus.paid
                               ? PdfColors.green900
-                              : PdfColors.orange900,
+                              : (order.status == OrderStatus.delivered
+                                    ? PdfColors.amber900
+                                    : (order.status == OrderStatus.cancelled
+                                          ? PdfColors.red900
+                                          : PdfColors.blue900)),
                         ),
                       ),
                     ),
@@ -520,7 +622,10 @@ class PartyReportPdfService {
           // Items Table
           pw.Table(
             border: const pw.TableBorder(
-              horizontalInside: pw.BorderSide(color: PdfColors.grey200, width: 0.5),
+              horizontalInside: pw.BorderSide(
+                color: PdfColors.grey200,
+                width: 0.5,
+              ),
             ),
             columnWidths: const {
               0: pw.FlexColumnWidth(3),
@@ -536,9 +641,21 @@ class PartyReportPdfService {
                 children: [
                   _tableCell('Product & Size', isHeader: true),
                   _tableCell('Qty', isHeader: true, align: pw.TextAlign.center),
-                  _tableCell('Unit Price', isHeader: true, align: pw.TextAlign.right),
-                  _tableCell('Discount', isHeader: true, align: pw.TextAlign.right),
-                  _tableCell('Subtotal', isHeader: true, align: pw.TextAlign.right),
+                  _tableCell(
+                    'Unit Price',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _tableCell(
+                    'Discount',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _tableCell(
+                    'Subtotal',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                 ],
               ),
               ...order.items.map((item) {
@@ -547,13 +664,20 @@ class PartyReportPdfService {
                     _tableCell(item.productName),
                     _tableCell(
                       item.quantity.toStringAsFixed(
-                        item.quantity.truncateToDouble() == item.quantity ? 0 : 2,
+                        item.quantity.truncateToDouble() == item.quantity
+                            ? 0
+                            : 2,
                       ),
                       align: pw.TextAlign.center,
                     ),
-                    _tableCell('$currency ${item.unitPrice.toStringAsFixed(0)}', align: pw.TextAlign.right),
                     _tableCell(
-                      item.discount > 0 ? '-$currency ${item.discount.toStringAsFixed(0)}' : '-',
+                      '$currency ${item.unitPrice.toStringAsFixed(0)}',
+                      align: pw.TextAlign.right,
+                    ),
+                    _tableCell(
+                      item.discount > 0
+                          ? '-$currency ${item.discount.toStringAsFixed(0)}'
+                          : '-',
                       align: pw.TextAlign.right,
                     ),
                     _tableCell(
@@ -572,7 +696,10 @@ class PartyReportPdfService {
               padding: const pw.EdgeInsets.all(4),
               child: pw.Text(
                 'Note: ${order.note!}',
-                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                style: const pw.TextStyle(
+                  fontSize: 7,
+                  color: PdfColors.grey700,
+                ),
               ),
             ),
         ],
@@ -628,25 +755,43 @@ class PartyReportPdfService {
                 _tableCell('Total', isHeader: true, align: pw.TextAlign.right),
                 _tableCell('Paid', isHeader: true, align: pw.TextAlign.right),
                 _tableCell('Due', isHeader: true, align: pw.TextAlign.right),
-                _tableCell('Status', isHeader: true, align: pw.TextAlign.center),
+                _tableCell(
+                  'Status',
+                  isHeader: true,
+                  align: pw.TextAlign.center,
+                ),
               ],
             ),
             ...sales.map((sale) {
               final itemsSummary = sale.items
-                  .map((i) => '${i.productName} (${i.quantity.toStringAsFixed(0)})')
+                  .map(
+                    (i) =>
+                        '${i.productName} (${i.quantity.toStringAsFixed(0)})',
+                  )
                   .join(', ');
               return pw.TableRow(
                 children: [
                   _tableCell(_dateFormat.format(sale.saleDate)),
-                  _tableCell(itemsSummary.isNotEmpty ? itemsSummary : 'Direct Sale'),
-                  _tableCell('$currency ${sale.totalAmount.toStringAsFixed(0)}', align: pw.TextAlign.right),
-                  _tableCell('$currency ${sale.paidAmount.toStringAsFixed(0)}', align: pw.TextAlign.right),
+                  _tableCell(
+                    itemsSummary.isNotEmpty ? itemsSummary : 'Direct Sale',
+                  ),
+                  _tableCell(
+                    '$currency ${sale.totalAmount.toStringAsFixed(0)}',
+                    align: pw.TextAlign.right,
+                  ),
+                  _tableCell(
+                    '$currency ${sale.paidAmount.toStringAsFixed(0)}',
+                    align: pw.TextAlign.right,
+                  ),
                   _tableCell(
                     '$currency ${sale.balanceDue.toStringAsFixed(0)}',
                     align: pw.TextAlign.right,
                     isBold: sale.balanceDue > 0,
                   ),
-                  _tableCell(sale.status.value.toUpperCase(), align: pw.TextAlign.center),
+                  _tableCell(
+                    sale.status.value.toUpperCase(),
+                    align: pw.TextAlign.center,
+                  ),
                 ],
               );
             }),
@@ -657,7 +802,10 @@ class PartyReportPdfService {
   }
 
   // ─── Payments History Table ────────────────────────────────────────
-  static pw.Widget _buildPaymentsSection(List<PaymentModel> payments, String currency) {
+  static pw.Widget _buildPaymentsSection(
+    List<PaymentModel> payments,
+    String currency,
+  ) {
     if (payments.isEmpty) return pw.SizedBox();
 
     return pw.Column(
@@ -708,8 +856,14 @@ class PartyReportPdfService {
                 children: [
                   _tableCell(_dateFormat.format(p.paymentDate)),
                   _tableCell(p.mode.label),
-                  _tableCell('$currency ${p.amount.toStringAsFixed(0)}', align: pw.TextAlign.right, isBold: true),
-                  _tableCell(p.note != null && p.note!.isNotEmpty ? p.note! : '-'),
+                  _tableCell(
+                    '$currency ${p.amount.toStringAsFixed(0)}',
+                    align: pw.TextAlign.right,
+                    isBold: true,
+                  ),
+                  _tableCell(
+                    p.note != null && p.note!.isNotEmpty ? p.note! : '-',
+                  ),
                 ],
               );
             }),
@@ -732,11 +886,12 @@ class PartyReportPdfService {
         textAlign: align,
         style: pw.TextStyle(
           fontSize: isHeader ? 7.5 : 7,
-          fontWeight: isHeader || isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          fontWeight: isHeader || isBold
+              ? pw.FontWeight.bold
+              : pw.FontWeight.normal,
           color: isHeader ? PdfColors.black : PdfColors.grey900,
         ),
       ),
     );
   }
 }
-

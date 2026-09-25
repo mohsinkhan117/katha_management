@@ -11,6 +11,7 @@ import 'package:katha_management/core/models/sale_item_model.dart';
 import 'package:katha_management/core/models/sale_model.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'package:katha_management/core/utils/app_dialogs/collect_payment_sheet.dart';
+import 'package:katha_management/ui/features/add_party/add_party_view.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
@@ -54,6 +55,60 @@ class _PartyHistoryViewBody extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          if (vm.party != null) ...[
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: AppStrings.editPartyTitle,
+              onPressed: () async {
+                final updated = await Navigator.push(
+                  context,
+                  AddPartyView.route(partyToEdit: vm.party),
+                );
+                if (updated == true && context.mounted) {
+                  vm.load();
+                }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: AppStrings.deletePartyButton,
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text(AppStrings.deletePartyTitle),
+                    content: const Text(AppStrings.deletePartyMessage),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text(AppStrings.no),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                        ),
+                        child: const Text(AppStrings.deletePartyButton),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  final deleted = await vm.deleteParty();
+                  if (deleted && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(AppStrings.partyDeletedSuccess),
+                      ),
+                    );
+                    if (Navigator.canPop(context)) {
+                      Navigator.of(context).pop(true);
+                    }
+                  }
+                }
+              },
+            ),
+          ],
           if (vm.isGeneratingPdf)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -299,6 +354,43 @@ class _BalanceHeader extends StatelessWidget {
               const Divider(height: AppSizes.lg),
             ],
 
+            if (party != null && party.openingBalance > 0) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: AppSizes.sm),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.sm,
+                  vertical: AppSizes.xs + 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.tetraColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+                  border: Border.all(
+                    color: AppColors.tetraColor.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.history_toggle_off_outlined,
+                      size: 16,
+                      color: AppColors.tetraColor,
+                    ),
+                    const SizedBox(width: AppSizes.xs),
+                    Expanded(
+                      child: Text(
+                        '${AppStrings.openingBalanceLabel}: ${AppStrings.currencyPrefix}${party.openingBalance.toStringAsFixed(0)} • ${AppStrings.openingBalanceInfoNote}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.tetraColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Statistics 2x2 Grid (Total Sales, Payments, Balance, Orders)
             Row(
               children: [
@@ -339,7 +431,9 @@ class _BalanceHeader extends StatelessWidget {
                 Expanded(
                   child: _StatCard(
                     title: '${AppStrings.ordersStat} (${vm.totalOrdersCount})',
-                    value: '${vm.pendingOrdersCount} ${AppStrings.tabPending}',
+                    value: vm.totalOrdersAmount > 0
+                        ? '${AppStrings.currencyPrefix}${vm.totalOrdersAmount.toStringAsFixed(0)}'
+                        : '${vm.pendingOrdersCount} ${AppStrings.tabPending}',
                     icon: Icons.receipt_long_outlined,
                     color: AppColors.secondary,
                   ),
@@ -894,36 +988,107 @@ class _TimelineTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (order.balanceDue > 0 && !order.status.isTerminal)
-              ElevatedButton.icon(
-                icon: const Icon(Icons.payments_outlined, size: 14),
-                label: const Text(AppStrings.collectAdvancePayment),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.sm,
-                    vertical: AppSizes.xs,
-                  ),
-                ),
-                onPressed: () async {
-                  final collected = await showCollectPaymentSheet(
-                    context,
-                    partyId: vm.partyId,
-                    partyName: vm.party?.name ?? order.partyName,
-                    partyPhone: vm.party?.phone ?? order.partyPhone,
-                    suggestedAmount: order.balanceDue,
-                    orderId: order.id,
-                  );
-                  if (collected == true && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(AppStrings.paymentCollectedSuccess),
+            Wrap(
+              spacing: AppSizes.xs,
+              runSpacing: AppSizes.xs,
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (order.status == OrderStatus.placed) ...[
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.edit_outlined, size: 14),
+                    label: const Text(AppStrings.editOrderTitle),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSizes.sm,
+                        vertical: AppSizes.xs,
                       ),
-                    );
-                    vm.load();
-                  }
-                },
-              ),
+                      minimumSize: const Size(60, 32),
+                    ),
+                    onPressed: () async {
+                      final updated = await Navigator.push(
+                        context,
+                        NewOrderView.route(orderToEdit: order),
+                      );
+                      if (updated == true && context.mounted) {
+                        vm.load();
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      size: AppSizes.iconSm,
+                      color: AppColors.error,
+                    ),
+                    tooltip: AppStrings.deleteOrderButton,
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text(AppStrings.deleteOrderTitle),
+                          content: const Text(AppStrings.deleteOrderMessage),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text(AppStrings.no),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                              ),
+                              child: const Text(AppStrings.deleteOrderButton),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        final deleted = await vm.deleteOrder(order.id);
+                        if (deleted && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(AppStrings.orderDeletedSuccess),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ],
+                if (order.balanceDue > 0 && !order.status.isTerminal)
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.payments_outlined, size: 14),
+                    label: const Text(AppStrings.collectAdvancePayment),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSizes.sm,
+                        vertical: AppSizes.xs,
+                      ),
+                      minimumSize: const Size(60, 32),
+                    ),
+                    onPressed: () async {
+                      final collected = await showCollectPaymentSheet(
+                        context,
+                        partyId: vm.partyId,
+                        partyName: vm.party?.name ?? order.partyName,
+                        partyPhone: vm.party?.phone ?? order.partyPhone,
+                        suggestedAmount: order.balanceDue,
+                        orderId: order.id,
+                      );
+                      if (collected == true && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(AppStrings.paymentCollectedSuccess),
+                          ),
+                        );
+                        vm.load();
+                      }
+                    },
+                  ),
+              ],
+            ),
           ],
         ),
       ],
@@ -1196,12 +1361,10 @@ class _OrderStatusBadge extends StatelessWidget {
   Color get _color {
     switch (status) {
       case OrderStatus.placed:
-        return AppColors.warning;
-      case OrderStatus.confirmed:
-        return AppColors.primary;
-      case OrderStatus.dispatched:
         return AppColors.secondary;
       case OrderStatus.delivered:
+        return AppColors.warning;
+      case OrderStatus.paid:
         return AppColors.success;
       case OrderStatus.cancelled:
         return AppColors.error;

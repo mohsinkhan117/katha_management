@@ -4,7 +4,7 @@ import 'package:katha_management/core/models/new_order/new_order_item_model.dart
 import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:uuid/uuid.dart';
 
-enum OrderStatus { placed, confirmed, dispatched, delivered, cancelled }
+enum OrderStatus { placed, delivered, paid, cancelled }
 
 enum OrderPaymentStatus { unpaid, partial, paid }
 
@@ -28,49 +28,54 @@ extension OrderStatusX on OrderStatus {
     switch (this) {
       case OrderStatus.placed:
         return 'Placed';
-      case OrderStatus.confirmed:
-        return 'Confirmed';
-      case OrderStatus.dispatched:
-        return 'Dispatched';
       case OrderStatus.delivered:
         return 'Delivered';
+      case OrderStatus.paid:
+        return 'Paid';
       case OrderStatus.cancelled:
         return 'Cancelled';
     }
   }
 
   /// The next status in the normal flow. Null once an order reaches a
-  /// terminal state (delivered / cancelled).
+  /// terminal state (paid / cancelled).
   OrderStatus? get next {
     switch (this) {
       case OrderStatus.placed:
-        return OrderStatus.confirmed;
-      case OrderStatus.confirmed:
-        return OrderStatus.dispatched;
-      case OrderStatus.dispatched:
         return OrderStatus.delivered;
       case OrderStatus.delivered:
+        return OrderStatus.paid;
+      case OrderStatus.paid:
       case OrderStatus.cancelled:
         return null;
     }
   }
 
   bool get isTerminal =>
-      this == OrderStatus.delivered || this == OrderStatus.cancelled;
+      this == OrderStatus.paid || this == OrderStatus.cancelled;
 
   static OrderStatus fromString(String value) {
-    return OrderStatus.values.firstWhere(
-      (status) => status.name == value,
-      orElse: () => OrderStatus.placed,
-    );
+    switch (value) {
+      case 'delivered':
+        return OrderStatus.delivered;
+      case 'paid':
+        return OrderStatus.paid;
+      case 'cancelled':
+        return OrderStatus.cancelled;
+      case 'confirmed':
+      case 'dispatched':
+      case 'placed':
+      default:
+        return OrderStatus.placed;
+    }
   }
 }
 
 /// An order placed by a party, tracked through
-/// placed → confirmed → dispatched → delivered (or cancelled).
+/// placed → delivered → paid (or cancelled).
 ///
-/// Supports advance payments collected at order time. Once delivered,
-/// it's converted into a Sale/Invoice with advance payments cleanly carried over.
+/// Supports advance payments collected at order time. Once delivered and paid,
+/// remaining balance is automatically settled into payments and customer ledger.
 class OrderModel {
   final String id;
   final String? partyId;

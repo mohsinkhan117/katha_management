@@ -45,7 +45,13 @@ class DashboardViewmodel extends ChangeNotifier {
        _orderRepository = orderRepository ?? SqfliteOrderRepository(),
        _paymentRepository = paymentRepository ?? SqflitePaymentRepository(),
        _partyRepository = partyRepository ?? SqflitePartyRepository(),
-       _balanceService = balanceService ?? PartyBalanceService() {
+       _balanceService =
+           balanceService ??
+           PartyBalanceService(
+             saleRepository: saleRepository,
+             paymentRepository: paymentRepository,
+             orderRepository: orderRepository,
+           ) {
     loadDashboardData();
   }
 
@@ -93,9 +99,19 @@ class DashboardViewmodel extends ChangeNotifier {
             date.day == now.day;
       }
 
-      todaySales = sales
+      final todayDirectSales = sales
           .where((sale) => isToday(sale.saleDate))
           .fold(0.0, (sum, sale) => sum + sale.totalAmount);
+
+      final todayOrders = orders
+          .where(
+            (order) =>
+                isToday(order.orderDate) &&
+                order.status != OrderStatus.cancelled,
+          )
+          .fold(0.0, (sum, order) => sum + order.totalAmount);
+
+      todaySales = todayDirectSales + todayOrders;
 
       todayCollection = payments
           .where((payment) => isToday(payment.paymentDate))

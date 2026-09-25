@@ -162,21 +162,110 @@ class _CustomerTile extends StatelessWidget {
             color: AppColors.textSecondary,
           ),
         ),
-        trailing: hasBalance
-            ? Text(
-                'Rs ${summary.balanceDue.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.tetraColor,
-                ),
-              )
-            : const Text(
-                AppStrings.settled,
-                style: TextStyle(
-                  fontSize: AppSizes.fontSizeSm,
-                  color: AppColors.success,
-                ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            hasBalance
+                ? Text(
+                    'Rs ${summary.balanceDue.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.tetraColor,
+                    ),
+                  )
+                : const Text(
+                    AppStrings.settled,
+                    style: TextStyle(
+                      fontSize: AppSizes.fontSizeSm,
+                      color: AppColors.success,
+                    ),
+                  ),
+            PopupMenuButton<String>(
+              icon: const Icon(
+                Icons.more_vert,
+                size: 20,
+                color: AppColors.textSecondary,
               ),
+              padding: EdgeInsets.zero,
+              onSelected: (action) async {
+                final vm = context.read<CustomersViewModel>();
+                if (action == 'edit') {
+                  final party = await vm.getParty(summary.partyId);
+                  if (party != null && context.mounted) {
+                    final updated = await Navigator.push(
+                      context,
+                      AddPartyView.route(partyToEdit: party),
+                    );
+                    if (updated == true && context.mounted) {
+                      vm.refresh();
+                    }
+                  }
+                } else if (action == 'delete') {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text(AppStrings.deletePartyTitle),
+                      content: const Text(AppStrings.deletePartyMessage),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text(AppStrings.no),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                          ),
+                          child: const Text(AppStrings.deletePartyButton),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true && context.mounted) {
+                    final deleted = await vm.deleteParty(summary.partyId);
+                    if (deleted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(AppStrings.partyDeletedSuccess),
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              itemBuilder: (ctx) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: 8),
+                      Text(AppStrings.editPartyTitle),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: AppColors.error,
+                      ),
+                      SizedBox(width: 8),
+                      Text(AppStrings.deletePartyButton),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

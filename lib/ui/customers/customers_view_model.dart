@@ -1,6 +1,7 @@
 // lib/ui/customers/customers_view_model.dart
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/models/party_model.dart';
 import 'package:katha_management/features/party/data/repositories/party_repository.dart';
 import 'package:katha_management/features/party/data/repositories/sqflite_party_repository.dart';
 
@@ -69,6 +70,20 @@ class CustomersViewModel extends ChangeNotifier {
   void setSearchQuery(String value) {
     _query = value;
     notifyListeners();
+  }
+
+  Future<PartyModel?> getParty(String id) => _partyRepository.getPartyById(id);
+
+  Future<bool> deleteParty(String id) async {
+    try {
+      await _partyRepository.deleteParty(id);
+      await loadParties();
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to delete customer: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> refresh() => loadParties();

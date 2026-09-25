@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
+import 'package:katha_management/core/models/new_order/new_order_model.dart';
 import 'package:katha_management/core/models/party_model.dart';
 import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/models/product/product_model.dart';
@@ -15,20 +16,34 @@ import 'new_order_view_model.dart';
 
 class NewOrderView extends StatelessWidget {
   static const routeName = '/new-order-view';
-  static Route route({String? partyId}) {
+  static Route route({String? partyId, OrderModel? orderToEdit}) {
     return MaterialPageRoute(
-      builder: (context) => NewOrderView(partyId: partyId),
-      settings: RouteSettings(name: routeName, arguments: partyId),
+      builder: (context) =>
+          NewOrderView(partyId: partyId, orderToEdit: orderToEdit),
+      settings: RouteSettings(
+        name: routeName,
+        arguments: orderToEdit ?? partyId,
+      ),
     );
   }
 
-  const NewOrderView({super.key, this.partyId});
+  const NewOrderView({super.key, this.partyId, this.orderToEdit});
   final String? partyId;
+  final OrderModel? orderToEdit;
 
   @override
   Widget build(BuildContext context) {
+    final routeArgs = ModalRoute.of(context)?.settings.arguments;
+    final effectiveOrder =
+        orderToEdit ?? (routeArgs is OrderModel ? routeArgs : null);
+    final effectivePartyId =
+        partyId ?? (routeArgs is String ? routeArgs : null);
+
     return ChangeNotifierProvider(
-      create: (_) => NewOrderViewModel(initialPartyId: partyId),
+      create: (_) => NewOrderViewModel(
+        initialPartyId: effectivePartyId,
+        orderToEdit: effectiveOrder,
+      ),
       child: const _NewOrderViewBody(),
     );
   }
@@ -47,6 +62,20 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
   final _advancePaidController = TextEditingController();
   final _noteController = TextEditingController();
   final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final vm = context.read<NewOrderViewModel>();
+    if (vm.isEditing) {
+      _partyNameController.text = vm.partyName;
+      _partyPhoneController.text = vm.partyPhone;
+      if (vm.advancePaid > 0) {
+        _advancePaidController.text = vm.advancePaid.toStringAsFixed(0);
+      }
+      _noteController.text = vm.note ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -92,10 +121,86 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.newOrderButton)),
+      appBar: AppBar(
+        title: Text(
+          vm.isEditing ? AppStrings.editOrderTitle : AppStrings.newOrderButton,
+        ),
+        actions: [
+          if (vm.isEditing && vm.canEdit)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: AppStrings.deleteOrderButton,
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text(AppStrings.deleteOrderTitle),
+                    content: const Text(AppStrings.deleteOrderMessage),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text(AppStrings.no),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                        ),
+                        child: const Text(AppStrings.deleteOrderButton),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  final orderVm = context.read<NewOrderViewModel>();
+                  final deleted = await orderVm.deleteOrder();
+                  if (deleted && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(AppStrings.orderDeletedSuccess),
+                      ),
+                    );
+                    if (Navigator.canPop(context)) {
+                      Navigator.of(context).pop(true);
+                    }
+                  }
+                }
+              },
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
+          if (vm.isEditing && !vm.canEdit) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: AppSizes.sm),
+              padding: const EdgeInsets.all(AppSizes.sm),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.lock_outline, color: AppColors.error, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      AppStrings.cannotEditDeliveredOrPaidOrder,
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const _StatusBadge(),
           const SizedBox(height: AppSizes.spaceBtwSections),
 
@@ -418,7 +523,8 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
             width: double.infinity,
             height: AppSizes.buttonHeight,
             child: ElevatedButton(
-              onPressed: vm.isSaving || !vm.canSave
+              onPressed:
+                  vm.isSaving || !vm.canSave || (vm.isEditing && !vm.canEdit)
                   ? null
                   : () async {
                       final orderVm = context.read<NewOrderViewModel>();
@@ -426,12 +532,16 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                       if (!context.mounted) return;
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(AppStrings.orderPlacedSuccess),
+                          SnackBar(
+                            content: Text(
+                              orderVm.isEditing
+                                  ? AppStrings.orderUpdatedSuccess
+                                  : AppStrings.orderPlacedSuccess,
+                            ),
                           ),
                         );
                         if (Navigator.canPop(context)) {
-                          Navigator.of(context).pop();
+                          Navigator.of(context).pop(true);
                         }
                       }
                     },
@@ -450,9 +560,11 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                         color: AppColors.textWhite,
                       ),
                     )
-                  : const Text(
-                      AppStrings.placeOrderButton,
-                      style: TextStyle(
+                  : Text(
+                      vm.isEditing
+                          ? AppStrings.updateOrderButton
+                          : AppStrings.placeOrderButton,
+                      style: const TextStyle(
                         color: AppColors.textWhite,
                         fontWeight: FontWeight.bold,
                       ),

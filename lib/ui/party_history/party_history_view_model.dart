@@ -1,6 +1,7 @@
 // lib/ui/party_history/party_history_view_model.dart
 
 import 'package:flutter/material.dart';
+import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
 import 'package:katha_management/core/models/party_balance_summary.dart';
 import 'package:katha_management/core/models/party_model.dart';
@@ -92,16 +93,38 @@ class PartyHistoryViewModel extends ChangeNotifier {
   // ─── Summary Statistics ─────────────────────────────────────────────
   double get totalSalesAmount =>
       sales.fold(0.0, (sum, s) => sum + s.totalAmount);
+  double get totalOrdersAmount => orders
+      .where((o) => o.status != OrderStatus.cancelled)
+      .fold(0.0, (sum, o) => sum + o.totalAmount);
   double get totalPaymentsAmount =>
       payments.fold(0.0, (sum, p) => sum + p.amount);
   int get totalOrdersCount => orders.length;
-  int get pendingOrdersCount =>
-      orders.where((o) => o.status != OrderStatus.delivered).length;
-  int get deliveredOrdersCount =>
-      orders.where((o) => o.status == OrderStatus.delivered).length;
+  int get pendingOrdersCount => orders
+      .where(
+        (o) =>
+            o.status == OrderStatus.placed || o.status == OrderStatus.delivered,
+      )
+      .length;
+  int get deliveredOrdersCount => orders
+      .where(
+        (o) =>
+            o.status == OrderStatus.delivered || o.status == OrderStatus.paid,
+      )
+      .length;
 
   List<PartyHistoryEntry> get timeline {
     final entries = <PartyHistoryEntry>[
+      if ((filter == PartyHistoryFilter.all ||
+              filter == PartyHistoryFilter.sales) &&
+          party != null &&
+          party!.openingBalance > 0)
+        PartyHistoryEntry(
+          type: PartyHistoryEntryType.sale,
+          amount: party!.openingBalance,
+          date: party!.createdAt,
+          title: AppStrings.openingBalanceLabel,
+          subtitle: AppStrings.openingBalanceInfoNote,
+        ),
       if (filter == PartyHistoryFilter.all ||
           filter == PartyHistoryFilter.sales)
         ...sales.map(
@@ -155,11 +178,70 @@ class PartyHistoryViewModel extends ChangeNotifier {
 
   Future<void> updateOrderStatus(String orderId, OrderStatus newStatus) async {
     try {
-      await _orderRepository.updateOrderStatus(orderId, newStatus);
+      final order = orders.where((o) => o.id == orderId).firstOrNull;
+      if (newStatus == OrderStatus.paid && order != null) {
+        final unpaidBalance = order.balanceDue;
+        if (unpaidBalance > 0) {
+          final payment = PaymentModel(
+            partyId: order.partyId,
+            partyName: order.partyName,
+            partyPhone: order.partyPhone,
+            amount: unpaidBalance,
+            mode: order.paymentMode,
+            note:
+                'Settled on Order #${order.id.length > 6 ? order.id.substring(0, 6).toUpperCase() : order.id} marked as Paid',
+          );
+          await _paymentRepository.insertPayment(payment);
+        }
+
+        final updatedOrder = order.copyWith(
+          status: OrderStatus.paid,
+          advancePaid: order.totalAmount,
+        );
+        await _orderRepository.updateOrder(updatedOrder);
+      } else {
+        await _orderRepository.updateOrderStatus(orderId, newStatus);
+      }
+
       await load();
     } catch (e) {
       errorMessage = 'Failed to update order status: $e';
       notifyListeners();
+    }
+  }
+
+  Future<bool> deleteParty() async {
+    try {
+      await _partyRepository.deleteParty(partyId);
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to delete party: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteOrder(String orderId) async {
+    try {
+      await _orderRepository.deleteOrder(orderId);
+      await load();
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to delete order: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> cancelOrder(String orderId) async {
+    try {
+      await _orderRepository.updateOrderStatus(orderId, OrderStatus.cancelled);
+      await load();
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to cancel order: $e';
+      notifyListeners();
+      return false;
     }
   }
 

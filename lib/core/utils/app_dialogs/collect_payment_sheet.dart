@@ -3,9 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
+import 'package:katha_management/core/models/new_order/new_order_model.dart';
 import 'package:katha_management/core/models/payment/payment_allocation_model.dart';
 import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
+import 'package:katha_management/features/order/data/repositories/order_repository.dart';
+import 'package:katha_management/features/order/data/repositories/sqflite_order_repository.dart';
 import 'package:katha_management/features/payment/data/repositories/payment_repository.dart';
 import 'package:katha_management/features/payment/data/repositories/sqflite_payment_repository.dart';
 
@@ -21,6 +24,7 @@ Future<bool?> showCollectPaymentSheet(
   String? orderId,
   String? initialNote,
   PaymentRepository? paymentRepository,
+  OrderRepository? orderRepository,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -39,6 +43,7 @@ Future<bool?> showCollectPaymentSheet(
       orderId: orderId,
       initialNote: initialNote,
       paymentRepository: paymentRepository ?? SqflitePaymentRepository(),
+      orderRepository: orderRepository ?? SqfliteOrderRepository(),
     ),
   );
 }
@@ -53,6 +58,7 @@ class _CollectPaymentSheet extends StatefulWidget {
     this.orderId,
     this.initialNote,
     required this.paymentRepository,
+    required this.orderRepository,
   });
 
   final String? partyId;
@@ -63,6 +69,7 @@ class _CollectPaymentSheet extends StatefulWidget {
   final String? orderId;
   final String? initialNote;
   final PaymentRepository paymentRepository;
+  final OrderRepository orderRepository;
 
   @override
   State<_CollectPaymentSheet> createState() => _CollectPaymentSheetState();
@@ -149,6 +156,23 @@ class _CollectPaymentSheetState extends State<_CollectPaymentSheet> {
         payment,
         allocations: allocations,
       );
+
+      // If collected against an order, sync the order's advancePaid and status in SQLite
+      if (widget.orderId != null) {
+        final order = await widget.orderRepository.getOrderById(
+          widget.orderId!,
+        );
+        if (order != null) {
+          final newAdvance = order.advancePaid + amount;
+          final isFullyPaid =
+              newAdvance >= order.totalAmount && order.totalAmount > 0;
+          final updatedOrder = order.copyWith(
+            advancePaid: newAdvance,
+            status: isFullyPaid ? OrderStatus.paid : order.status,
+          );
+          await widget.orderRepository.updateOrder(updatedOrder);
+        }
+      }
 
       if (!mounted) return;
       Navigator.pop(context, true);

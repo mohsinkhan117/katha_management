@@ -321,11 +321,41 @@ class NewSaleViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      String? effectivePartyId = selectedPartyId;
+      final cleanPartyName = partyName.trim();
+      final cleanPartyPhone = partyPhone.trim().isEmpty
+          ? null
+          : partyPhone.trim();
+
+      // Auto-create party if entered on-the-fly and not already existing
+      if (effectivePartyId == null && cleanPartyName.isNotEmpty) {
+        final existingParties = await _partyRepository.searchParties(
+          cleanPartyName,
+        );
+        final exactMatch = existingParties
+            .where(
+              (p) =>
+                  p.name.trim().toLowerCase() == cleanPartyName.toLowerCase(),
+            )
+            .firstOrNull;
+
+        if (exactMatch != null) {
+          effectivePartyId = exactMatch.id;
+        } else {
+          final newParty = PartyModel(
+            name: cleanPartyName,
+            phone: cleanPartyPhone,
+          );
+          await _partyRepository.createParty(newParty);
+          effectivePartyId = newParty.id;
+        }
+      }
+
       final saleItems = items;
       final sale = SaleModel(
-        partyId: selectedPartyId,
-        partyName: partyName.trim(),
-        partyPhone: partyPhone.trim().isEmpty ? null : partyPhone.trim(),
+        partyId: effectivePartyId,
+        partyName: cleanPartyName,
+        partyPhone: cleanPartyPhone,
         items: saleItems,
         paidAmount: 0,
         note: note,
@@ -341,9 +371,9 @@ class NewSaleViewModel extends ChangeNotifier {
       // 2. If upfront payment was made, record payment and allocate
       if (paidAmount > 0) {
         final payment = PaymentModel(
-          partyId: selectedPartyId,
-          partyName: partyName.trim(),
-          partyPhone: partyPhone.trim().isEmpty ? null : partyPhone.trim(),
+          partyId: effectivePartyId,
+          partyName: cleanPartyName,
+          partyPhone: cleanPartyPhone,
           amount: paidAmount,
           mode: paymentMode,
           note: note != null && note!.trim().isNotEmpty

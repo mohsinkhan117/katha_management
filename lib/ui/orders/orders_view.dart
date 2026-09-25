@@ -226,17 +226,14 @@ class _OrderCard extends StatefulWidget {
 
 class _OrderCardState extends State<_OrderCard> {
   bool _isExpanded = false;
-  bool _isConverting = false;
 
   Color _getStatusColor(OrderStatus status) {
     switch (status) {
       case OrderStatus.placed:
         return AppColors.secondary;
-      case OrderStatus.confirmed:
-        return AppColors.primary;
-      case OrderStatus.dispatched:
-        return AppColors.warning;
       case OrderStatus.delivered:
+        return AppColors.warning;
+      case OrderStatus.paid:
         return AppColors.success;
       case OrderStatus.cancelled:
         return AppColors.error;
@@ -251,35 +248,11 @@ class _OrderCardState extends State<_OrderCard> {
     return DateFormat('dd MMM yyyy').format(dt);
   }
 
-  Future<void> _handleConvertToSale(OrderModel order, OrderViewModel vm) async {
-    // Local guard against a fast double-tap firing this twice before
-    // the widget rebuilds — the real guard lives in the ViewModel
-    // (`order.convertedSaleId`), this just avoids a redundant call.
-    if (_isConverting) return;
-    setState(() => _isConverting = true);
-
-    final success = await vm.convertToSale(order);
-
-    if (!mounted) return;
-    setState(() => _isConverting = false);
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppStrings.orderConvertedToSale)),
-      );
-    } else if (vm.errorMessage != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(vm.errorMessage!)));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
     final statusColor = _getStatusColor(order.status);
     final vm = context.read<OrderViewModel>();
-    final alreadyConverted = order.convertedSaleId != null;
 
     return Card(
       elevation: AppSizes.cardElevation,
@@ -576,41 +549,117 @@ class _OrderCardState extends State<_OrderCard> {
                     ),
                     const SizedBox(width: AppSizes.xs),
                   ],
-                  IconButton(
-                    icon: const Icon(
-                      Icons.cancel_outlined,
-                      size: AppSizes.iconSm,
-                      color: AppColors.error,
+                  if (order.status == OrderStatus.placed) ...[
+                    IconButton(
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: AppSizes.iconSm,
+                        color: AppColors.primary,
+                      ),
+                      tooltip: AppStrings.editOrderTitle,
+                      onPressed: () async {
+                        final updated = await Navigator.push(
+                          context,
+                          NewOrderView.route(orderToEdit: order),
+                        );
+                        if (updated == true && context.mounted) {
+                          vm.refresh();
+                        }
+                      },
                     ),
-                    tooltip: AppStrings.cancelOrderTooltip,
+                    const SizedBox(width: AppSizes.xs),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: AppSizes.iconSm,
+                        color: AppColors.error,
+                      ),
+                      tooltip: AppStrings.deleteOrderButton,
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text(AppStrings.deleteOrderTitle),
+                            content: const Text(AppStrings.deleteOrderMessage),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text(AppStrings.no),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.error,
+                                ),
+                                child: const Text(AppStrings.deleteOrderButton),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          final deleted = await vm.deleteOrder(order.id);
+                          if (deleted && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(AppStrings.orderDeletedSuccess),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(width: AppSizes.xs),
+                  ] else ...[
+                    IconButton(
+                      icon: const Icon(
+                        Icons.cancel_outlined,
+                        size: AppSizes.iconSm,
+                        color: AppColors.error,
+                      ),
+                      tooltip: AppStrings.cancelOrderTooltip,
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text(AppStrings.cancelOrderTitle),
+                            content: const Text(AppStrings.cancelOrderMessage),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text(AppStrings.no),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text(AppStrings.yesCancel),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          await vm.cancelOrder(order.id);
+                        }
+                      },
+                    ),
+                    const SizedBox(width: AppSizes.xs),
+                  ],
+                  ElevatedButton(
                     onPressed: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text(AppStrings.cancelOrderTitle),
-                          content: const Text(AppStrings.cancelOrderMessage),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text(AppStrings.no),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text(AppStrings.yesCancel),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        await vm.cancelOrder(order.id);
+                      final nextStatus = order.status.next;
+                      final success = await vm.advanceStatus(order);
+                      if (success &&
+                          nextStatus == OrderStatus.paid &&
+                          context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(AppStrings.orderPaidSuccess),
+                          ),
+                        );
                       }
                     },
-                  ),
-                  const SizedBox(width: AppSizes.xs),
-                  ElevatedButton(
-                    onPressed: () => vm.advanceStatus(order),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: statusColor,
+                      backgroundColor: order.status == OrderStatus.placed
+                          ? AppColors.warning
+                          : AppColors.success,
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSizes.sm,
                         vertical: AppSizes.xs,
@@ -625,63 +674,40 @@ class _OrderCardState extends State<_OrderCard> {
                       ),
                     ),
                   ),
-                ] else if (order.status == OrderStatus.delivered) ...[
-                  if (alreadyConverted)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.sm,
-                        vertical: AppSizes.xs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.borderRadiusSm,
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline,
-                            size: AppSizes.iconSm,
-                            color: AppColors.success,
-                          ),
-                          SizedBox(width: AppSizes.xs),
-                          Text(
-                            AppStrings.convertedToSaleBadge,
-                            style: TextStyle(
-                              fontSize: AppSizes.fontSizeSm,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.success,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    OutlinedButton.icon(
-                      onPressed: _isConverting
-                          ? null
-                          : () => _handleConvertToSale(order, vm),
-                      icon: _isConverting
-                          ? const SizedBox(
-                              height: AppSizes.iconSm,
-                              width: AppSizes.iconSm,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(
-                              Icons.point_of_sale_outlined,
-                              size: AppSizes.iconSm,
-                            ),
-                      label: const Text(AppStrings.convertToSaleButton),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSizes.sm,
-                          vertical: AppSizes.xs,
-                        ),
-                        minimumSize: const Size(80, 32),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.sm,
+                      vertical: AppSizes.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(
+                        AppSizes.borderRadiusSm,
                       ),
                     ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          order.status == OrderStatus.paid
+                              ? Icons.check_circle_outline
+                              : Icons.cancel_outlined,
+                          size: AppSizes.iconSm,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: AppSizes.xs),
+                        Text(
+                          order.status.label,
+                          style: TextStyle(
+                            fontSize: AppSizes.fontSizeSm,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ],
             ),

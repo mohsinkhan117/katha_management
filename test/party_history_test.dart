@@ -301,6 +301,12 @@ void main() {
       // Transition to delivered
       await vm.updateOrderStatus('order_1', OrderStatus.delivered);
       expect(vm.orders.first.status, OrderStatus.delivered);
+      expect(vm.pendingOrdersCount, 1);
+      expect(vm.deliveredOrdersCount, 1);
+
+      // Transition to paid
+      await vm.updateOrderStatus('order_1', OrderStatus.paid);
+      expect(vm.orders.first.status, OrderStatus.paid);
       expect(vm.pendingOrdersCount, 0);
       expect(vm.deliveredOrdersCount, 1);
     });

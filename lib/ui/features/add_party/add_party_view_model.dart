@@ -6,17 +6,31 @@ import 'package:katha_management/core/models/party_model.dart';
 import 'package:katha_management/features/party/data/repositories/party_repository.dart';
 import 'package:katha_management/features/party/data/repositories/sqflite_party_repository.dart';
 
-/// Drives the Add Party form.
+/// Drives the Add / Edit Party form.
 ///
 /// Depends on [PartyRepository] (the interface), not on
 /// [SqflitePartyRepository] directly — a mock repository can be
 /// passed in for tests, and a Firestore/sync repository can replace
 /// it later without touching this class.
 class AddPartyViewModel extends ChangeNotifier {
-  AddPartyViewModel({PartyRepository? repository})
-    : _repository = repository ?? SqflitePartyRepository();
+  AddPartyViewModel({PartyModel? partyToEdit, PartyRepository? repository})
+    : _repository = repository ?? SqflitePartyRepository(),
+      _partyToEdit = partyToEdit {
+    if (partyToEdit != null) {
+      name = partyToEdit.name;
+      phone = partyToEdit.phone ?? '';
+      address = partyToEdit.address ?? '';
+      openingBalance = partyToEdit.openingBalance;
+      tag = partyToEdit.tag;
+      note = partyToEdit.note;
+    }
+  }
 
   final PartyRepository _repository;
+  final PartyModel? _partyToEdit;
+
+  bool get isEditing => _partyToEdit != null;
+  PartyModel? get partyToEdit => _partyToEdit;
 
   String name = '';
   String phone = '';
@@ -71,6 +85,10 @@ class AddPartyViewModel extends ChangeNotifier {
   Future<void> _checkDuplicate(String value) async {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
+    if (isEditing &&
+        trimmed.toLowerCase() == _partyToEdit!.name.trim().toLowerCase()) {
+      return;
+    }
 
     isCheckingDuplicate = true;
     notifyListeners();
@@ -78,7 +96,9 @@ class AddPartyViewModel extends ChangeNotifier {
     try {
       final matches = await _repository.searchParties(trimmed);
       final exactMatch = matches.any(
-        (party) => party.name.trim().toLowerCase() == trimmed.toLowerCase(),
+        (party) =>
+            party.id != _partyToEdit?.id &&
+            party.name.trim().toLowerCase() == trimmed.toLowerCase(),
       );
 
       // The name may have changed again while this lookup was in
@@ -108,20 +128,51 @@ class AddPartyViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final party = PartyModel(
-        name: name.trim(),
-        phone: phone.trim().isEmpty ? null : phone.trim(),
-        address: address.trim().isEmpty ? null : address.trim(),
-        openingBalance: openingBalance,
-        tag: tag,
-        note: note,
-      );
+      if (isEditing) {
+        final updatedParty = _partyToEdit!.copyWith(
+          name: name.trim(),
+          phone: phone.trim().isEmpty ? null : phone.trim(),
+          address: address.trim().isEmpty ? null : address.trim(),
+          openingBalance: openingBalance,
+          tag: tag,
+          note: note,
+        );
+        await _repository.updateParty(updatedParty);
+        return true;
+      } else {
+        final party = PartyModel(
+          name: name.trim(),
+          phone: phone.trim().isEmpty ? null : phone.trim(),
+          address: address.trim().isEmpty ? null : address.trim(),
+          openingBalance: openingBalance,
+          tag: tag,
+          note: note,
+        );
 
-      await _repository.createParty(party);
-      _resetForm();
-      return true;
+        await _repository.createParty(party);
+        _resetForm();
+        return true;
+      }
     } catch (e) {
       errorMessage = 'Failed to save party: $e';
+      return false;
+    } finally {
+      isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteParty() async {
+    if (_partyToEdit == null) return false;
+    isSaving = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteParty(_partyToEdit.id);
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to delete party: $e';
       return false;
     } finally {
       isSaving = false;

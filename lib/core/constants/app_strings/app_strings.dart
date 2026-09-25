@@ -48,7 +48,7 @@ class AppStrings {
   static const String noPendingBalances = 'No pending balances';
   static const String noRecentActivity = 'No recent activity';
   static const String daysOverdueSuffix = 'd overdue';
-  static const String openingBalanceLabel = 'Opening balance';
+  static const String openingBalanceLabel = 'Previous Due (Opening Balance)';
   static const String quickActionNewSale = 'New Sale';
   static const String quickActionNewOrder = 'New Order';
   static const String quickActionAddPayment = 'Add Payment';
@@ -68,13 +68,23 @@ class AppStrings {
   static const String partyPhoneLabel = 'Phone (optional)';
   static const String partyAddressLabel = 'Address (optional)';
   static const String categorySection = 'Category';
-  static const String openingBalanceSection = 'Opening Balance';
+  static const String openingBalanceSection = 'Previous Due (Opening Balance)';
   static const String openingBalanceAmountLabel =
-      'Amount already due (optional)';
+      'Unpaid Due Amount (optional)';
   static const String openingBalanceHelper =
-      'Use this for balances carried over from before the app';
+      'Enter previous unpaid balance / due carried over from before this app';
+  static const String openingBalanceInfoNote =
+      'Previous unpaid balance carried over from before this app';
   static const String savePartyButton = 'Save Party';
+  static const String updatePartyButton = 'Update Party';
+  static const String editPartyTitle = 'Edit Party';
   static const String partyAddedSuccess = 'Party added';
+  static const String partyUpdatedSuccess = 'Party updated successfully';
+  static const String deletePartyTitle = 'Delete Party?';
+  static const String deletePartyMessage =
+      'Are you sure you want to delete this party? All related transaction history may be affected.';
+  static const String deletePartyButton = 'Delete Party';
+  static const String partyDeletedSuccess = 'Party deleted successfully';
   static const String partyDetailsSection = 'Party Details';
   static const String selectExistingCustomer = 'Select Existing Customer';
   static const String selectCustomer = 'Select Customer';
@@ -89,6 +99,8 @@ class AppStrings {
   static const String noPendingOrders = 'No pending orders';
   static const String noDoneOrders = 'No completed/cancelled orders';
   static const String newOrderButton = 'New Order';
+  static const String editOrderTitle = 'Edit Order';
+  static const String updateOrderButton = 'Update Order';
   static const String orderConvertedToSale = 'Order converted to Sale invoice';
   static const String orderedPrefix = 'Ordered: ';
   static const String updatedPrefix = 'Updated: ';
@@ -100,6 +112,13 @@ class AppStrings {
   static const String cancelOrderMessage =
       'Are you sure you want to cancel this order?';
   static const String yesCancel = 'Yes, Cancel';
+  static const String deleteOrderTitle = 'Delete Order?';
+  static const String deleteOrderMessage =
+      'Are you sure you want to permanently delete this order?';
+  static const String deleteOrderButton = 'Delete';
+  static const String orderDeletedSuccess = 'Order deleted successfully';
+  static const String cannotEditDeliveredOrPaidOrder =
+      'Orders that are Delivered or Paid cannot be modified.';
   static const String convertedToSaleBadge = 'Converted to Sale';
   static const String convertToSaleButton = 'Convert to Sale';
   static const String changeStatusTooltip = 'Change Status';
@@ -117,7 +136,11 @@ class AppStrings {
   static const String orderPlacedSuccess = 'Order placed successfully';
   static const String placeOrderButton = 'Place Order';
   static const String orderSavedSuccess = 'Order saved successfully';
-  static const String saveOrderButton = 'Save Order';
+  static const String orderUpdatedSuccess = 'Order updated successfully';
+  static const String markDelivered = 'Mark Delivered';
+  static const String markPaid = 'Mark Paid';
+  static const String orderPaidSuccess =
+      'Order marked as Paid and balance settled';
   static const String itemSingular = 'item';
   static const String itemsPlural = 'items';
 

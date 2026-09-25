@@ -2,36 +2,27 @@
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/models/new_order/new_order_model.dart';
-import 'package:katha_management/core/models/payment/payment_allocation_model.dart';
 import 'package:katha_management/core/models/payment/payment_model.dart';
-import 'package:katha_management/core/models/sale_item_model.dart';
-import 'package:katha_management/core/models/sale_model.dart';
 import 'package:katha_management/features/order/data/repositories/order_repository.dart';
 import 'package:katha_management/features/order/data/repositories/sqflite_order_repository.dart';
 import 'package:katha_management/features/payment/data/repositories/payment_repository.dart';
 import 'package:katha_management/features/payment/data/repositories/sqflite_payment_repository.dart';
-import 'package:katha_management/features/sale/data/repositories/sale_repository.dart';
-import 'package:katha_management/features/sale/data/repositories/sqflite_sale_repository.dart';
 
 /// ViewModel driving the Orders screen.
 ///
-/// Categorizes orders into Pending (placed, confirmed, dispatched)
-/// and Done (delivered, cancelled), and allows advancing lifecycle
-/// status, collecting payments, cancelling, or converting delivered orders into
-/// sales.
+/// Categorizes orders into Pending (placed, delivered)
+/// and Done (paid, cancelled), and allows advancing lifecycle
+/// status (placed -> delivered -> paid), collecting advance payments, or cancelling orders.
 class OrderViewModel extends ChangeNotifier {
   OrderViewModel({
     OrderRepository? orderRepository,
-    SaleRepository? saleRepository,
     PaymentRepository? paymentRepository,
   }) : _orderRepository = orderRepository ?? SqfliteOrderRepository(),
-       _saleRepository = saleRepository ?? SqfliteSaleRepository(),
        _paymentRepository = paymentRepository ?? SqflitePaymentRepository() {
     loadOrders();
   }
 
   final OrderRepository _orderRepository;
-  final SaleRepository _saleRepository;
   final PaymentRepository _paymentRepository;
 
   List<OrderModel> _allOrders = [];
@@ -48,8 +39,7 @@ class OrderViewModel extends ChangeNotifier {
   List<OrderModel> get pendingOrders {
     final filtered = _allOrders.where((order) {
       return order.status == OrderStatus.placed ||
-          order.status == OrderStatus.confirmed ||
-          order.status == OrderStatus.dispatched;
+          order.status == OrderStatus.delivered;
     }).toList();
 
     return _applySearch(filtered);
@@ -57,7 +47,7 @@ class OrderViewModel extends ChangeNotifier {
 
   List<OrderModel> get doneOrders {
     final filtered = _allOrders.where((order) {
-      return order.status == OrderStatus.delivered ||
+      return order.status == OrderStatus.paid ||
           order.status == OrderStatus.cancelled;
     }).toList();
 
@@ -66,12 +56,11 @@ class OrderViewModel extends ChangeNotifier {
 
   int get pendingCount => _allOrders.where((order) {
     return order.status == OrderStatus.placed ||
-        order.status == OrderStatus.confirmed ||
-        order.status == OrderStatus.dispatched;
+        order.status == OrderStatus.delivered;
   }).length;
 
   int get doneCount => _allOrders.where((order) {
-    return order.status == OrderStatus.delivered ||
+    return order.status == OrderStatus.paid ||
         order.status == OrderStatus.cancelled;
   }).length;
 
@@ -114,14 +103,45 @@ class OrderViewModel extends ChangeNotifier {
 
   Future<void> refresh() => loadOrders();
 
-  /// Advances the order to its next logical status (placed -> confirmed
-  /// -> dispatched -> delivered).
+  /// Advances the order to its next logical status (placed -> delivered -> paid).
   Future<bool> advanceStatus(OrderModel order) async {
     final nextStatus = order.status.next;
     if (nextStatus == null) return false;
 
+    return updateOrderStatus(order, nextStatus);
+  }
+
+  /// Updates the order status. When advancing to [OrderStatus.paid], any remaining
+  /// unpaid balance is automatically settled and recorded in SQLite payments.
+  Future<bool> updateOrderStatus(
+    OrderModel order,
+    OrderStatus newStatus,
+  ) async {
     try {
-      await _orderRepository.updateOrderStatus(order.id, nextStatus);
+      if (newStatus == OrderStatus.paid) {
+        final unpaidBalance = order.balanceDue;
+        if (unpaidBalance > 0) {
+          final payment = PaymentModel(
+            partyId: order.partyId,
+            partyName: order.partyName,
+            partyPhone: order.partyPhone,
+            amount: unpaidBalance,
+            mode: order.paymentMode,
+            note:
+                'Settled on Order #${order.id.length > 6 ? order.id.substring(0, 6).toUpperCase() : order.id} marked as Paid',
+          );
+          await _paymentRepository.insertPayment(payment);
+        }
+
+        final updatedOrder = order.copyWith(
+          status: OrderStatus.paid,
+          advancePaid: order.totalAmount,
+        );
+        await _orderRepository.updateOrder(updatedOrder);
+      } else {
+        await _orderRepository.updateOrderStatus(order.id, newStatus);
+      }
+
       await loadOrders();
       return true;
     } catch (e) {
@@ -176,94 +196,6 @@ class OrderViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = 'Failed to record payment: $e';
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Converts an order into a Sale/Invoice.
-  ///
-  /// Guarded by `order.convertedSaleId`: once an order has produced a
-  /// sale, this returns `false` immediately rather than creating a
-  /// second one. This check lives here — not just as a hidden button
-  /// in the View — because a UI-only guard doesn't protect against a
-  /// fast double-tap landing before the first call's rebuild disables
-  /// it, or against some future second entry point calling this
-  /// method directly.
-  Future<bool> convertToSale(OrderModel order) async {
-    if (order.convertedSaleId != null) {
-      _errorMessage = 'This order has already been converted to a sale.';
-      notifyListeners();
-      return false;
-    }
-
-    try {
-      final saleItems = order.items.map((item) {
-        return SaleItemModel(
-          saleId: '',
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          discount: item.discount,
-        );
-      }).toList();
-
-      final sale = SaleModel(
-        partyId: order.partyId,
-        partyName: order.partyName,
-        partyPhone: order.partyPhone,
-        items: saleItems,
-        paidAmount: order.advancePaid,
-        note:
-            'Converted from Order #${order.id.substring(0, 6).toUpperCase()}${order.note != null ? ' - ${order.note}' : ''}',
-      );
-
-      final finalSale = sale.copyWith(
-        items: saleItems.map((i) => i.attachToSale(sale.id)).toList(),
-      );
-
-      await _saleRepository.createSale(finalSale);
-
-      // If there was an advance payment on the order, allocate it to the generated sale
-      if (order.advancePaid > 0) {
-        final payment = PaymentModel(
-          partyId: order.partyId,
-          partyName: order.partyName,
-          partyPhone: order.partyPhone,
-          amount: order.advancePaid,
-          mode: order.paymentMode,
-          note: 'Advance on Order #${order.id.substring(0, 6).toUpperCase()}',
-        );
-
-        final allocation = PaymentAllocationModel(
-          paymentId: payment.id,
-          saleId: finalSale.id,
-          amountApplied: order.advancePaid > finalSale.totalAmount
-              ? finalSale.totalAmount
-              : order.advancePaid,
-        );
-
-        await _paymentRepository.insertPayment(
-          payment,
-          allocations: [allocation],
-        );
-      }
-
-      // Status and the conversion link are written together in one
-      // update — if these were two separate repository calls, a
-      // failure between them could leave an order marked "delivered"
-      // with no record of which sale it produced, or vice versa.
-      final updatedOrder = order.copyWith(
-        status: OrderStatus.delivered,
-        convertedSaleId: finalSale.id,
-      );
-      await _orderRepository.updateOrder(updatedOrder);
-
-      await loadOrders();
-      return true;
-    } catch (e) {
-      _errorMessage = 'Failed to convert order to sale: $e';
       notifyListeners();
       return false;
     }
