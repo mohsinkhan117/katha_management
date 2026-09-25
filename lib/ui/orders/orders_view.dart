@@ -19,10 +19,17 @@ class OrdersView extends StatelessWidget {
     );
   }
 
-  const OrdersView({super.key});
+  const OrdersView({super.key, this.viewModel});
+  final OrderViewModel? viewModel;
 
   @override
   Widget build(BuildContext context) {
+    if (viewModel != null) {
+      return ChangeNotifierProvider<OrderViewModel>.value(
+        value: viewModel!,
+        child: const _OrdersViewBody(),
+      );
+    }
     return ChangeNotifierProvider(
       create: (_) => OrderViewModel(),
       child: const _OrdersViewBody(),
@@ -80,8 +87,15 @@ class _OrdersViewBody extends StatelessWidget {
                   Tab(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(AppStrings.tabPending),
+                        Flexible(
+                          child: Text(
+                            AppStrings.tabPending,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         if (vm.pendingCount > 0) ...[
                           const SizedBox(width: AppSizes.xs),
                           Container(
@@ -109,8 +123,15 @@ class _OrdersViewBody extends StatelessWidget {
                   Tab(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(AppStrings.tabDone),
+                        Flexible(
+                          child: Text(
+                            AppStrings.tabDone,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         if (vm.doneCount > 0) ...[
                           const SizedBox(width: AppSizes.xs),
                           Container(
@@ -409,38 +430,48 @@ class _OrderCardState extends State<_OrderCard> {
           // Details: Timestamps, expected delivery & items summary
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${AppStrings.orderedPrefix}${_formatDate(order.orderDate)}',
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontSizeSm,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${AppStrings.updatedPrefix}${_formatDateTime(order.updatedAt)}',
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontSizeSm,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  if (order.expectedDeliveryDate != null) ...[
-                    const SizedBox(height: 2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      '${AppStrings.deliveryByPrefix}${_formatDate(order.expectedDeliveryDate!)}',
+                      '${AppStrings.orderedPrefix}${_formatDate(order.orderDate)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: AppSizes.fontSizeSm,
-                        color: AppColors.primary,
+                        color: AppColors.textSecondary,
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${AppStrings.updatedPrefix}${_formatDateTime(order.updatedAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: AppSizes.fontSizeSm,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    if (order.expectedDeliveryDate != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${AppStrings.deliveryByPrefix}${_formatDate(order.expectedDeliveryDate!)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: AppSizes.fontSizeSm,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
+              const SizedBox(width: AppSizes.sm),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -524,8 +555,9 @@ class _OrderCardState extends State<_OrderCard> {
 
           const SizedBox(height: AppSizes.sm),
 
-          // Action Buttons
+          // Utility & Expand Row
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               InkWell(
                 onTap: () => setState(() => _isExpanded = !_isExpanded),
@@ -555,40 +587,7 @@ class _OrderCardState extends State<_OrderCard> {
                   ),
                 ),
               ),
-              const Spacer(),
               if (!order.status.isTerminal) ...[
-                if (order.balanceDue > 0) ...[
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.payments_outlined, size: 14),
-                    label: Text(AppStrings.collectAdvancePayment),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.sm,
-                        vertical: AppSizes.xs,
-                      ),
-                      minimumSize: const Size(60, 32),
-                    ),
-                    onPressed: () async {
-                      final collected = await showCollectPaymentSheet(
-                        context,
-                        partyId: order.partyId,
-                        partyName: order.partyName,
-                        partyPhone: order.partyPhone,
-                        suggestedAmount: order.balanceDue,
-                        orderId: order.id,
-                      );
-                      if (collected == true && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(AppStrings.paymentCollectedSuccess),
-                          ),
-                        );
-                        vm.refresh();
-                      }
-                    },
-                  ),
-                  const SizedBox(width: AppSizes.xs),
-                ],
                 if (order.status == OrderStatus.placed) ...[
                   IconButton(
                     icon: const Icon(
@@ -682,36 +681,6 @@ class _OrderCardState extends State<_OrderCard> {
                   ),
                   const SizedBox(width: AppSizes.xs),
                 ],
-                ElevatedButton(
-                  onPressed: () async {
-                    final nextStatus = order.status.next;
-                    final success = await vm.advanceStatus(order);
-                    if (success &&
-                        nextStatus == OrderStatus.paid &&
-                        context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(AppStrings.orderPaidSuccess)),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: order.status == OrderStatus.placed
-                        ? AppColors.warning
-                        : AppColors.success,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.sm,
-                      vertical: AppSizes.xs,
-                    ),
-                    minimumSize: const Size(80, 32),
-                  ),
-                  child: Text(
-                    'Mark ${order.status.next?.label ?? 'Done'}',
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontSizeSm,
-                      color: AppColors.textWhite,
-                    ),
-                  ),
-                ),
               ] else ...[
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -749,6 +718,98 @@ class _OrderCardState extends State<_OrderCard> {
               ],
             ],
           ),
+
+          // Primary Actions Row (Collect Advance & Advance Status)
+          if (!order.status.isTerminal) ...[
+            const SizedBox(height: AppSizes.sm),
+            Row(
+              children: [
+                if (order.balanceDue > 0) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.payments_outlined, size: 16),
+                      label: Text(
+                        AppStrings.collectAdvancePayment,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.xs,
+                          vertical: AppSizes.xs + 2,
+                        ),
+                        minimumSize: const Size(0, 36),
+                      ),
+                      onPressed: () async {
+                        final collected = await showCollectPaymentSheet(
+                          context,
+                          partyId: order.partyId,
+                          partyName: order.partyName,
+                          partyPhone: order.partyPhone,
+                          suggestedAmount: order.balanceDue,
+                          orderId: order.id,
+                        );
+                        if (collected == true && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(AppStrings.paymentCollectedSuccess),
+                            ),
+                          );
+                          vm.refresh();
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: AppSizes.sm),
+                ],
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final nextStatus = order.status.next;
+                      final success = await vm.advanceStatus(order);
+                      if (success &&
+                          nextStatus == OrderStatus.paid &&
+                          context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(AppStrings.orderPaidSuccess)),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: order.status == OrderStatus.placed
+                          ? AppColors.warning
+                          : AppColors.success,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSizes.xs,
+                        vertical: AppSizes.xs + 2,
+                      ),
+                      minimumSize: const Size(0, 36),
+                    ),
+                    child: Text(
+                      order.status == OrderStatus.placed
+                          ? AppStrings.markDelivered
+                          : (order.status == OrderStatus.delivered
+                              ? AppStrings.markPaid
+                              : (order.status.next?.label ?? 'Done')),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: AppSizes.fontSizeSm,
+                        color: AppColors.textWhite,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
