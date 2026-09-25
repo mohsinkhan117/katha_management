@@ -134,19 +134,19 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text(AppStrings.deleteOrderTitle),
-                    content: const Text(AppStrings.deleteOrderMessage),
+                    title: Text(AppStrings.deleteOrderTitle),
+                    content: Text(AppStrings.deleteOrderMessage),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text(AppStrings.no),
+                        child: Text(AppStrings.no),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.error,
                         ),
-                        child: const Text(AppStrings.deleteOrderButton),
+                        child: Text(AppStrings.deleteOrderButton),
                       ),
                     ],
                   ),
@@ -156,7 +156,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                   final deleted = await orderVm.deleteOrder();
                   if (deleted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(AppStrings.orderDeletedSuccess),
                       ),
                     );
@@ -183,7 +183,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                   color: AppColors.error.withValues(alpha: 0.3),
                 ),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(Icons.lock_outline, color: AppColors.error, size: 18),
                   SizedBox(width: 8),
@@ -205,7 +205,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
           const SizedBox(height: AppSizes.spaceBtwSections),
 
           // ─── Party Selection ──────────────────────────────────────
-          const _SectionLabel(AppStrings.partyDetailsSection),
+          _SectionLabel(AppStrings.partyDetailsSection),
           const SizedBox(height: AppSizes.sm),
 
           if (vm.linkedParty != null) ...[
@@ -231,7 +231,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
             ],
             TextField(
               controller: _partyNameController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.partyNameLabel,
               ),
               onChanged: (value) =>
@@ -244,7 +244,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
             TextField(
               controller: _partyPhoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.partyPhoneLabel,
               ),
               onChanged: (value) =>
@@ -258,13 +258,13 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
           const SizedBox(height: AppSizes.spaceBtwSections),
 
           // ─── Expected Delivery Date ────────────────────────────────
-          const _SectionLabel(AppStrings.expectedDeliveryDateLabel),
+          _SectionLabel(AppStrings.expectedDeliveryDateLabel),
           const SizedBox(height: AppSizes.sm),
           InkWell(
             onTap: () => _pickDeliveryDate(context),
             borderRadius: BorderRadius.circular(AppSizes.inputFieldRadius),
             child: InputDecorator(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.deliveryDateOptional,
                 suffixIcon: Icon(
                   Icons.calendar_today_outlined,
@@ -290,7 +290,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const _SectionLabel(AppStrings.selectProductsSection),
+              _SectionLabel(AppStrings.selectProductsSection),
               Text(
                 '${vm.items.length} ${AppStrings.itemsPlural} added',
                 style: const TextStyle(
@@ -301,7 +301,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
             ],
           ),
           const SizedBox(height: AppSizes.xs),
-          const Text(
+          Text(
             AppStrings.selectProductsInstruction,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
@@ -343,7 +343,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                 color: AppColors.lightContainer,
                 borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   AppStrings.noProductsFoundInCatalog,
                   style: TextStyle(color: AppColors.textSecondary),
@@ -364,7 +364,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
           const SizedBox(height: AppSizes.spaceBtwSections),
 
           // ─── Advance Payment Section ────────────────────────────────
-          const _SectionLabel(AppStrings.advancePaymentSection),
+          _SectionLabel(AppStrings.advancePaymentSection),
           const SizedBox(height: AppSizes.xs),
 
           // Quick Presets for Order Advance
@@ -398,7 +398,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                     size: 16,
                     color: AppColors.primary,
                   ),
-                  label: const Text(AppStrings.quickToken500),
+                  label: Text(AppStrings.quickToken500),
                   onPressed: () {
                     _advancePaidController.text = '500';
                     context.read<NewOrderViewModel>().setAdvancePaid(500);
@@ -411,7 +411,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                     size: 16,
                     color: AppColors.primary,
                   ),
-                  label: const Text(AppStrings.quickToken1000),
+                  label: Text(AppStrings.quickToken1000),
                   onPressed: () {
                     _advancePaidController.text = '1000';
                     context.read<NewOrderViewModel>().setAdvancePaid(1000);
@@ -424,7 +424,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                     size: 16,
                     color: AppColors.tetraColor,
                   ),
-                  label: const Text(AppStrings.quickUnpaid),
+                  label: Text(AppStrings.quickUnpaid),
                   onPressed: () {
                     _advancePaidController.text = '0';
                     context.read<NewOrderViewModel>().setAdvancePaid(0);
@@ -438,7 +438,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
           TextField(
             controller: _advancePaidController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.advancePaidLabel,
               prefixText: AppStrings.currencyPrefix,
               helperText: AppStrings.advancePaidHelper,
@@ -451,7 +451,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
 
           // Payment Mode Selector (when advancePaid > 0)
           if (vm.advancePaid > 0) ...[
-            const Text(
+            Text(
               AppStrings.paymentModeLabel,
               style: TextStyle(
                 fontSize: AppSizes.fontSizeSm,
@@ -495,7 +495,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
           TextField(
             controller: _noteController,
             maxLines: 2,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.noteOptional,
             ),
             onChanged: (value) =>
@@ -592,10 +592,10 @@ class _StatusBadge extends StatelessWidget {
         color: AppColors.secondary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppSizes.borderRadiusSm),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.info_outline,
             size: AppSizes.iconSm,
             color: AppColors.secondary,
@@ -761,7 +761,7 @@ class _OrderProductCardWithDropdownState
                 const SizedBox(height: 4),
                 DropdownButtonFormField<ProductSizeModel>(
                   isExpanded: true,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: AppStrings.selectPackageSizeLabel,
                     prefixIcon: Icon(Icons.inventory_2_outlined, size: 20),
                     contentPadding: EdgeInsets.symmetric(
@@ -967,7 +967,7 @@ class _OrderCustomItemExpanderState extends State<_OrderCustomItemExpander> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(Icons.add_shopping_cart, color: AppColors.secondary),
                       SizedBox(width: AppSizes.sm),
@@ -988,7 +988,7 @@ class _OrderCustomItemExpanderState extends State<_OrderCustomItemExpander> {
               const SizedBox(height: AppSizes.sm),
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.itemNameLabel,
                 ),
               ),
@@ -1001,7 +1001,7 @@ class _OrderCustomItemExpanderState extends State<_OrderCustomItemExpander> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: AppStrings.quantityLabel,
                       ),
                     ),
@@ -1013,7 +1013,7 @@ class _OrderCustomItemExpanderState extends State<_OrderCustomItemExpander> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: AppStrings.rateOrPriceLabel,
                         prefixText: AppStrings.currencyPrefix,
                       ),
@@ -1026,7 +1026,7 @@ class _OrderCustomItemExpanderState extends State<_OrderCustomItemExpander> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: AppStrings.discountLabel,
                         prefixText: AppStrings.currencyPrefix,
                       ),
@@ -1039,7 +1039,7 @@ class _OrderCustomItemExpanderState extends State<_OrderCustomItemExpander> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: _handleAdd,
-                  child: const Text(AppStrings.addCustomItemButton),
+                  child: Text(AppStrings.addCustomItemButton),
                 ),
               ),
             ],
@@ -1139,7 +1139,7 @@ class _PartyPickerDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<PartyModel>(
       isExpanded: true,
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         labelText: AppStrings.selectExistingCustomer,
         prefixIcon: Icon(Icons.person_outline),
       ),
@@ -1212,7 +1212,7 @@ class _OrderTotalCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       AppStrings.estimatedTotalLabel,
                       style: TextStyle(
                         fontSize: AppSizes.fontSizeMd,
@@ -1243,7 +1243,7 @@ class _OrderTotalCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     AppStrings.advancePaidLabel,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,
@@ -1265,7 +1265,7 @@ class _OrderTotalCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     AppStrings.balanceDueLabel,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,

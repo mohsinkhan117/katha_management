@@ -76,19 +76,19 @@ class _PartyHistoryViewBody extends StatelessWidget {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text(AppStrings.deletePartyTitle),
-                    content: const Text(AppStrings.deletePartyMessage),
+                    title: Text(AppStrings.deletePartyTitle),
+                    content: Text(AppStrings.deletePartyMessage),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text(AppStrings.no),
+                        child: Text(AppStrings.no),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.error,
                         ),
-                        child: const Text(AppStrings.deletePartyButton),
+                        child: Text(AppStrings.deletePartyButton),
                       ),
                     ],
                   ),
@@ -97,7 +97,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
                   final deleted = await vm.deleteParty();
                   if (deleted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(AppStrings.partyDeletedSuccess),
                       ),
                     );
@@ -164,7 +164,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
               ElevatedButton.icon(
                 icon: const Icon(Icons.refresh),
                 onPressed: vm.refresh,
-                label: const Text(AppStrings.retry),
+                label: Text(AppStrings.retry),
               ),
             ],
           ),
@@ -275,7 +275,7 @@ class _BalanceHeader extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Text(
+                      Text(
                         AppStrings.netBalanceLabel,
                         style: TextStyle(
                           fontSize: 11,
@@ -307,7 +307,7 @@ class _BalanceHeader extends StatelessWidget {
                             );
                             if (collected == true && context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                   content: Text(
                                     AppStrings.paymentCollectedSuccess,
                                   ),
@@ -325,10 +325,10 @@ class _BalanceHeader extends StatelessWidget {
                               color: AppColors.success.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.add,
                                   size: 12,
                                   color: AppColors.success,
@@ -557,7 +557,7 @@ class _QuickActions extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.point_of_sale_outlined, size: 18),
-                label: const Text(
+                label: Text(
                   AppStrings.actionSale,
                   style: TextStyle(fontSize: 13),
                 ),
@@ -578,7 +578,7 @@ class _QuickActions extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                label: const Text(
+                label: Text(
                   AppStrings.actionOrder,
                   style: TextStyle(fontSize: 13),
                 ),
@@ -599,7 +599,7 @@ class _QuickActions extends StatelessWidget {
             Expanded(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.payments_outlined, size: 18),
-                label: const Text(
+                label: Text(
                   AppStrings.actionPay,
                   style: TextStyle(fontSize: 13),
                 ),
@@ -624,7 +624,7 @@ class _QuickActions extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton.icon(
             icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-            label: const Text(AppStrings.exportPrintPdfTooltip),
+            label: Text(AppStrings.exportPrintPdfTooltip),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),
@@ -689,8 +689,8 @@ class _TimelineList extends StatelessWidget {
     final entries = vm.timeline;
 
     if (entries.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: AppSizes.lg),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSizes.lg),
         child: Center(
           child: Column(
             children: [
@@ -825,7 +825,7 @@ class _TimelineTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Text(
+                Text(
                   '${AppStrings.status}: ',
                   style: TextStyle(
                     fontSize: AppSizes.fontSizeSm,
@@ -913,7 +913,7 @@ class _TimelineTile extends StatelessWidget {
         ],
 
         // Order Items List
-        const Text(
+        Text(
           AppStrings.orderItemsLabel,
           style: TextStyle(
             fontSize: AppSizes.fontSizeSm,
@@ -997,7 +997,7 @@ class _TimelineTile extends StatelessWidget {
                 if (order.status == OrderStatus.placed) ...[
                   OutlinedButton.icon(
                     icon: const Icon(Icons.edit_outlined, size: 14),
-                    label: const Text(AppStrings.editOrderTitle),
+                    label: Text(AppStrings.editOrderTitle),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSizes.sm,
@@ -1026,19 +1026,19 @@ class _TimelineTile extends StatelessWidget {
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text(AppStrings.deleteOrderTitle),
-                          content: const Text(AppStrings.deleteOrderMessage),
+                          title: Text(AppStrings.deleteOrderTitle),
+                          content: Text(AppStrings.deleteOrderMessage),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text(AppStrings.no),
+                              child: Text(AppStrings.no),
                             ),
                             TextButton(
                               onPressed: () => Navigator.pop(ctx, true),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.error,
                               ),
-                              child: const Text(AppStrings.deleteOrderButton),
+                              child: Text(AppStrings.deleteOrderButton),
                             ),
                           ],
                         ),
@@ -1047,7 +1047,7 @@ class _TimelineTile extends StatelessWidget {
                         final deleted = await vm.deleteOrder(order.id);
                         if (deleted && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(AppStrings.orderDeletedSuccess),
                             ),
                           );
@@ -1059,7 +1059,7 @@ class _TimelineTile extends StatelessWidget {
                 if (order.balanceDue > 0 && !order.status.isTerminal)
                   ElevatedButton.icon(
                     icon: const Icon(Icons.payments_outlined, size: 14),
-                    label: const Text(AppStrings.collectAdvancePayment),
+                    label: Text(AppStrings.collectAdvancePayment),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(
@@ -1079,7 +1079,7 @@ class _TimelineTile extends StatelessWidget {
                       );
                       if (collected == true && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(AppStrings.paymentCollectedSuccess),
                           ),
                         );
@@ -1147,7 +1147,7 @@ class _TimelineTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Text(
+                Text(
                   '${AppStrings.status}: ',
                   style: TextStyle(
                     fontSize: AppSizes.fontSizeSm,
@@ -1171,7 +1171,7 @@ class _TimelineTile extends StatelessWidget {
 
         // Items Breakdown
         if (sale.items.isNotEmpty) ...[
-          const Text(
+          Text(
             AppStrings.saleItemsLabel,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
@@ -1238,7 +1238,7 @@ class _TimelineTile extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.payments_outlined, size: 16),
-              label: const Text(AppStrings.collectPayment),
+              label: Text(AppStrings.collectPayment),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
                 padding: const EdgeInsets.symmetric(
@@ -1257,7 +1257,7 @@ class _TimelineTile extends StatelessWidget {
                 );
                 if (collected == true && context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       content: Text(AppStrings.paymentCollectedSuccess),
                     ),
                   );

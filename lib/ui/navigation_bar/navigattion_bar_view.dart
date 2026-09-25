@@ -36,7 +36,7 @@ class _NavigationBarViewState extends State<NavigationBarView> {
     setState(() => _selectedIndex = index);
   }
 
-  static const List<BottomNavigationBarItem> _items = [
+  static final List<BottomNavigationBarItem> _items = [
     BottomNavigationBarItem(
       icon: Icon(Icons.dashboard),
       label: AppStrings.navDashboard,

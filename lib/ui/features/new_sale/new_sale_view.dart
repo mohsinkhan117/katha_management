@@ -71,12 +71,12 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.newSaleTitle)),
+      appBar: AppBar(title: Text(AppStrings.newSaleTitle)),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
           // ─── Party Selection ──────────────────────────────────────
-          const _SectionLabel(AppStrings.partyDetailsSection),
+          _SectionLabel(AppStrings.partyDetailsSection),
           const SizedBox(height: AppSizes.sm),
 
           if (vm.linkedParty != null) ...[
@@ -102,7 +102,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
             ],
             TextField(
               controller: _partyNameController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.partyNameLabel,
               ),
               onChanged: (value) =>
@@ -115,7 +115,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
             TextField(
               controller: _partyPhoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.partyPhoneLabel,
               ),
               onChanged: (value) =>
@@ -132,7 +132,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const _SectionLabel(AppStrings.selectProductsSection),
+              _SectionLabel(AppStrings.selectProductsSection),
               Text(
                 '${vm.items.length} ${AppStrings.itemsPlural} added',
                 style: const TextStyle(
@@ -143,7 +143,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
             ],
           ),
           const SizedBox(height: AppSizes.xs),
-          const Text(
+          Text(
             AppStrings.selectProductsInstruction,
             style: TextStyle(
               fontSize: AppSizes.fontSizeSm,
@@ -185,7 +185,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
                 color: AppColors.lightContainer,
                 borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   AppStrings.noProductsFoundInCatalog,
                   style: TextStyle(color: AppColors.textSecondary),
@@ -206,7 +206,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           const SizedBox(height: AppSizes.spaceBtwSections),
 
           // ─── Payment & Settlement ──────────────────────────────────
-          const _SectionLabel(AppStrings.paymentAndSettlementSection),
+          _SectionLabel(AppStrings.paymentAndSettlementSection),
           const SizedBox(height: AppSizes.xs),
 
           // Quick Presets (Full, Half, Unpaid)
@@ -258,7 +258,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
                     size: 16,
                     color: AppColors.tetraColor,
                   ),
-                  label: const Text(AppStrings.quickUnpaid),
+                  label: Text(AppStrings.quickUnpaid),
                   onPressed: () {
                     _paidAmountController.text = '0';
                     context.read<NewSaleViewModel>().setPaidAmount(0);
@@ -272,7 +272,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           TextField(
             controller: _paidAmountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.paidAmountUpfrontLabel,
               prefixText: AppStrings.currencyPrefix,
               helperText: AppStrings.paidAmountHelper,
@@ -285,7 +285,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
 
           // Payment Mode Selector (when paidAmount > 0)
           if (vm.paidAmount > 0) ...[
-            const Text(
+            Text(
               AppStrings.paymentModeLabel,
               style: TextStyle(
                 fontSize: AppSizes.fontSizeSm,
@@ -327,7 +327,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
           TextField(
             controller: _noteController,
             maxLines: 2,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.noteOptional,
             ),
             onChanged: (value) =>
@@ -358,7 +358,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
                       if (!context.mounted) return;
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(AppStrings.saleSavedSuccess),
                           ),
                         );
@@ -382,7 +382,7 @@ class _NewSaleViewBodyState extends State<_NewSaleViewBody> {
                         color: AppColors.textWhite,
                       ),
                     )
-                  : const Text(
+                  : Text(
                       AppStrings.saveSaleButton,
                       style: TextStyle(
                         color: AppColors.textWhite,
@@ -543,7 +543,7 @@ class _ProductCardWithDropdownState extends State<_ProductCardWithDropdown> {
                 const SizedBox(height: 4),
                 DropdownButtonFormField<ProductSizeModel>(
                   isExpanded: true,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: AppStrings.selectPackageSizeLabel,
                     prefixIcon: Icon(Icons.inventory_2_outlined, size: 20),
                     contentPadding: EdgeInsets.symmetric(
@@ -748,7 +748,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(Icons.add_shopping_cart, color: AppColors.secondary),
                       SizedBox(width: AppSizes.sm),
@@ -769,7 +769,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
               const SizedBox(height: AppSizes.sm),
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.itemNameLabel,
                 ),
               ),
@@ -782,7 +782,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: AppStrings.quantityLabel,
                       ),
                     ),
@@ -794,7 +794,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: AppStrings.rateOrPriceLabel,
                         prefixText: AppStrings.currencyPrefix,
                       ),
@@ -807,7 +807,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: AppStrings.discountLabel,
                         prefixText: AppStrings.currencyPrefix,
                       ),
@@ -820,7 +820,7 @@ class _CustomItemExpanderState extends State<_CustomItemExpander> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: _handleAdd,
-                  child: const Text(AppStrings.addCustomItemButton),
+                  child: Text(AppStrings.addCustomItemButton),
                 ),
               ),
             ],
@@ -920,7 +920,7 @@ class _PartyPickerDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<PartyModel>(
       isExpanded: true,
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         labelText: AppStrings.selectExistingCustomer,
         prefixIcon: Icon(Icons.person_outline),
       ),
@@ -981,7 +981,7 @@ class _TotalsCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   AppStrings.totalAmountLabel,
                   style: TextStyle(
                     fontSize: AppSizes.fontSizeMd,
@@ -1003,7 +1003,7 @@ class _TotalsCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     AppStrings.paidUpfrontLabel,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,
@@ -1024,7 +1024,7 @@ class _TotalsCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     AppStrings.balanceDueLabel,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,

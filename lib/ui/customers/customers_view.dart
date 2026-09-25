@@ -36,7 +36,7 @@ class _CustomersViewBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.customersTitle),
+        title: Text(AppStrings.customersTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add_alt_outlined),
@@ -63,7 +63,7 @@ class _CustomersViewBody extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(AppSizes.md),
                   child: TextField(
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       prefixIcon: Icon(Icons.search),
                       hintText: AppStrings.searchCustomersHint,
                     ),
@@ -84,7 +84,7 @@ class _CustomersViewBody extends StatelessWidget {
                   ),
                 Expanded(
                   child: vm.parties.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             AppStrings.noCustomersYet,
                             style: TextStyle(color: AppColors.textSecondary),
@@ -173,7 +173,7 @@ class _CustomerTile extends StatelessWidget {
                       color: AppColors.tetraColor,
                     ),
                   )
-                : const Text(
+                : Text(
                     AppStrings.settled,
                     style: TextStyle(
                       fontSize: AppSizes.fontSizeSm,
@@ -204,19 +204,19 @@ class _CustomerTile extends StatelessWidget {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text(AppStrings.deletePartyTitle),
-                      content: const Text(AppStrings.deletePartyMessage),
+                      title: Text(AppStrings.deletePartyTitle),
+                      content: Text(AppStrings.deletePartyMessage),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text(AppStrings.no),
+                          child: Text(AppStrings.no),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, true),
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.error,
                           ),
-                          child: const Text(AppStrings.deletePartyButton),
+                          child: Text(AppStrings.deletePartyButton),
                         ),
                       ],
                     ),
@@ -225,7 +225,7 @@ class _CustomerTile extends StatelessWidget {
                     final deleted = await vm.deleteParty(summary.partyId);
                     if (deleted && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
+                        SnackBar(
                           content: Text(AppStrings.partyDeletedSuccess),
                         ),
                       );
@@ -234,7 +234,7 @@ class _CustomerTile extends StatelessWidget {
                 }
               },
               itemBuilder: (ctx) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'edit',
                   child: Row(
                     children: [
@@ -248,7 +248,7 @@ class _CustomerTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [

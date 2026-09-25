@@ -41,7 +41,7 @@ class _OrdersViewBody extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text(AppStrings.ordersTitle),
+          title: Text(AppStrings.ordersTitle),
           bottom: TabBar(
             indicatorColor: AppColors.primary,
             labelColor: AppColors.primary,
@@ -51,7 +51,7 @@ class _OrdersViewBody extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(AppStrings.tabPending),
+                    Text(AppStrings.tabPending),
                     if (vm.pendingCount > 0) ...[
                       const SizedBox(width: AppSizes.xs),
                       Container(
@@ -80,7 +80,7 @@ class _OrdersViewBody extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(AppStrings.tabDone),
+                    Text(AppStrings.tabDone),
                     if (vm.doneCount > 0) ...[
                       const SizedBox(width: AppSizes.xs),
                       Container(
@@ -113,7 +113,7 @@ class _OrdersViewBody extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(AppSizes.md),
               child: TextField(
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   prefixIcon: Icon(Icons.search),
                   hintText: AppStrings.searchOrdersHint,
                 ),
@@ -155,7 +155,7 @@ class _OrdersViewBody extends StatelessWidget {
             }
           },
           icon: const Icon(Icons.add),
-          label: const Text(AppStrings.newOrderButton),
+          label: Text(AppStrings.newOrderButton),
           backgroundColor: AppColors.primary,
         ),
       ),
@@ -520,7 +520,7 @@ class _OrderCardState extends State<_OrderCard> {
                   if (order.balanceDue > 0) ...[
                     OutlinedButton.icon(
                       icon: const Icon(Icons.payments_outlined, size: 14),
-                      label: const Text(AppStrings.collectAdvancePayment),
+                      label: Text(AppStrings.collectAdvancePayment),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSizes.sm,
@@ -539,7 +539,7 @@ class _OrderCardState extends State<_OrderCard> {
                         );
                         if (collected == true && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(AppStrings.paymentCollectedSuccess),
                             ),
                           );
@@ -579,19 +579,19 @@ class _OrderCardState extends State<_OrderCard> {
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
-                            title: const Text(AppStrings.deleteOrderTitle),
-                            content: const Text(AppStrings.deleteOrderMessage),
+                            title: Text(AppStrings.deleteOrderTitle),
+                            content: Text(AppStrings.deleteOrderMessage),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text(AppStrings.no),
+                                child: Text(AppStrings.no),
                               ),
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, true),
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.error,
                                 ),
-                                child: const Text(AppStrings.deleteOrderButton),
+                                child: Text(AppStrings.deleteOrderButton),
                               ),
                             ],
                           ),
@@ -600,7 +600,7 @@ class _OrderCardState extends State<_OrderCard> {
                           final deleted = await vm.deleteOrder(order.id);
                           if (deleted && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
+                              SnackBar(
                                 content: Text(AppStrings.orderDeletedSuccess),
                               ),
                             );
@@ -621,16 +621,16 @@ class _OrderCardState extends State<_OrderCard> {
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
-                            title: const Text(AppStrings.cancelOrderTitle),
-                            content: const Text(AppStrings.cancelOrderMessage),
+                            title: Text(AppStrings.cancelOrderTitle),
+                            content: Text(AppStrings.cancelOrderMessage),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text(AppStrings.no),
+                                child: Text(AppStrings.no),
                               ),
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text(AppStrings.yesCancel),
+                                child: Text(AppStrings.yesCancel),
                               ),
                             ],
                           ),
@@ -650,7 +650,7 @@ class _OrderCardState extends State<_OrderCard> {
                           nextStatus == OrderStatus.paid &&
                           context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(AppStrings.orderPaidSuccess),
                           ),
                         );

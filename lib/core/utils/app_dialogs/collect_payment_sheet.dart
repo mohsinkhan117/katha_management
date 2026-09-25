@@ -229,7 +229,7 @@ class _CollectPaymentSheetState extends State<_CollectPaymentSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         AppStrings.collectPayment,
                         style: TextStyle(
                           fontSize: AppSizes.fontSizeLg,
@@ -301,7 +301,7 @@ class _CollectPaymentSheetState extends State<_CollectPaymentSheet> {
                         size: 16,
                         color: AppColors.secondary,
                       ),
-                      label: const Text(AppStrings.quickToken500),
+                      label: Text(AppStrings.quickToken500),
                       onPressed: () {
                         _amountController.text = '500';
                       },
@@ -319,7 +319,7 @@ class _CollectPaymentSheetState extends State<_CollectPaymentSheet> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.amountToCollect,
                 prefixText: AppStrings.currencyPrefix,
                 border: OutlineInputBorder(),
@@ -328,7 +328,7 @@ class _CollectPaymentSheetState extends State<_CollectPaymentSheet> {
             const SizedBox(height: AppSizes.md),
 
             // Payment Mode Selector
-            const Text(
+            Text(
               AppStrings.paymentModeLabel,
               style: TextStyle(
                 fontSize: AppSizes.fontSizeSm,
@@ -369,7 +369,7 @@ class _CollectPaymentSheetState extends State<_CollectPaymentSheet> {
             TextField(
               controller: _noteController,
               maxLines: 2,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.noteOptional,
                 border: OutlineInputBorder(),
               ),
@@ -406,7 +406,7 @@ class _CollectPaymentSheetState extends State<_CollectPaymentSheet> {
                           color: AppColors.textWhite,
                         ),
                       )
-                    : const Text(
+                    : Text(
                         AppStrings.savePaymentButton,
                         style: TextStyle(
                           color: AppColors.textWhite,

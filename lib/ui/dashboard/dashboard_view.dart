@@ -39,7 +39,7 @@ class _HomeViewBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.dashboardTitle),
+        title: Text(AppStrings.dashboardTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -69,11 +69,11 @@ class _HomeViewBody extends StatelessWidget {
                 const SizedBox(height: AppSizes.spaceBtwSections),
                 const _QuickActions(),
                 const SizedBox(height: AppSizes.spaceBtwSections),
-                const _SectionHeader(title: AppStrings.topPendingParties),
+                _SectionHeader(title: AppStrings.topPendingParties),
                 const SizedBox(height: AppSizes.spaceBtwItems),
                 _PendingPartiesList(parties: vm.topPendingParties),
                 const SizedBox(height: AppSizes.spaceBtwSections),
-                const _SectionHeader(title: AppStrings.recentActivity),
+                _SectionHeader(title: AppStrings.recentActivity),
                 const SizedBox(height: AppSizes.spaceBtwItems),
                 _RecentActivityList(items: vm.recentActivity),
                 const SizedBox(height: AppSizes.spaceBtwSections),
@@ -448,7 +448,7 @@ class _PendingPartiesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (parties.isEmpty) {
-      return const Text(
+      return Text(
         AppStrings.noPendingBalances,
         style: TextStyle(color: AppColors.textSecondary),
       );
@@ -549,7 +549,7 @@ class _RecentActivityList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const Text(
+      return Text(
         AppStrings.noRecentActivity,
         style: TextStyle(color: AppColors.textSecondary),
       );

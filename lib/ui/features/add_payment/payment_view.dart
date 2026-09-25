@@ -51,7 +51,7 @@ class _PaymentViewState extends State<PaymentView> {
                 '${AppStrings.paymentsTitle} - ${vm.linkedParty!.name}',
               );
             }
-            return const Text(AppStrings.paymentsTitle);
+            return Text(AppStrings.paymentsTitle);
           },
         ),
       ),
@@ -77,7 +77,7 @@ class _PaymentViewState extends State<PaymentView> {
                 children: [
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 0.4,
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         AppStrings.noPaymentsYet,
                         style: TextStyle(color: AppColors.textSecondary),
@@ -174,7 +174,7 @@ class _PaymentViewState extends State<PaymentView> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openAddPaymentSheet(context),
         icon: const Icon(Icons.add),
-        label: const Text(AppStrings.recordPaymentButton),
+        label: Text(AppStrings.recordPaymentButton),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -184,16 +184,16 @@ class _PaymentViewState extends State<PaymentView> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(AppStrings.deletePaymentTitle),
-        content: const Text(AppStrings.deletePaymentConfirm),
+        title: Text(AppStrings.deletePaymentTitle),
+        content: Text(AppStrings.deletePaymentConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(AppStrings.cancel),
+            child: Text(AppStrings.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
+            child: Text(
               AppStrings.delete,
               style: TextStyle(color: AppColors.error),
             ),
@@ -236,7 +236,7 @@ class _PaymentViewState extends State<PaymentView> {
 
     if (context.mounted && success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppStrings.paymentRecordedSuccess)),
+        SnackBar(content: Text(AppStrings.paymentRecordedSuccess)),
       );
     }
   }
@@ -382,7 +382,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                 if (widget.availableParties.isNotEmpty) ...[
                   DropdownButtonFormField<PartyModel>(
                     isExpanded: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: AppStrings.selectCustomer,
                       prefixIcon: Icon(Icons.person_outline),
                     ),
@@ -416,7 +416,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                 ],
                 TextFormField(
                   controller: _partyNameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: AppStrings.partyNameLabel,
                   ),
                   validator: (value) => (value == null || value.trim().isEmpty)
@@ -428,7 +428,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
 
               TextFormField(
                 controller: _amountController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.amountRequiredLabel,
                   prefixText: AppStrings.currencyPrefix,
                 ),
@@ -447,7 +447,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               DropdownButtonFormField<PaymentMode>(
                 isExpanded: true,
                 initialValue: _mode,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.paymentModeLabel,
                 ),
                 items: PaymentMode.values
@@ -468,7 +468,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
               const SizedBox(height: AppSizes.sm),
               TextFormField(
                 controller: _noteController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: AppStrings.noteOptional,
                 ),
               ),
@@ -485,7 +485,7 @@ class _AddPaymentSheetState extends State<_AddPaymentSheet> {
                       ),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     AppStrings.savePaymentButton,
                     style: TextStyle(color: AppColors.textWhite),
                   ),

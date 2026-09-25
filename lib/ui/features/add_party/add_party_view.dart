@@ -88,19 +88,19 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text(AppStrings.deletePartyTitle),
-                    content: const Text(AppStrings.deletePartyMessage),
+                    title: Text(AppStrings.deletePartyTitle),
+                    content: Text(AppStrings.deletePartyMessage),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text(AppStrings.no),
+                        child: Text(AppStrings.no),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.error,
                         ),
-                        child: const Text(AppStrings.deletePartyButton),
+                        child: Text(AppStrings.deletePartyButton),
                       ),
                     ],
                   ),
@@ -110,7 +110,7 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
                   final deleted = await partyVm.deleteParty();
                   if (deleted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(AppStrings.partyDeletedSuccess),
                       ),
                     );
@@ -126,7 +126,7 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
-          const _SectionLabel(AppStrings.basicInfoSection),
+          _SectionLabel(AppStrings.basicInfoSection),
           const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _nameController,
@@ -172,7 +172,7 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.partyPhoneLabel,
             ),
             onChanged: (value) =>
@@ -181,23 +181,23 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
           const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _addressController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.partyAddressLabel,
             ),
             onChanged: (value) =>
                 context.read<AddPartyViewModel>().setAddress(value),
           ),
           const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel(AppStrings.categorySection),
+          _SectionLabel(AppStrings.categorySection),
           const SizedBox(height: AppSizes.sm),
           _TagSelector(selected: vm.tag),
           const SizedBox(height: AppSizes.spaceBtwSections),
-          const _SectionLabel(AppStrings.openingBalanceSection),
+          _SectionLabel(AppStrings.openingBalanceSection),
           const SizedBox(height: AppSizes.sm),
           TextField(
             controller: _openingBalanceController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.openingBalanceAmountLabel,
               helperText: AppStrings.openingBalanceHelper,
             ),
@@ -209,7 +209,7 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
           TextField(
             controller: _noteController,
             maxLines: 2,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppStrings.noteOptional,
             ),
             onChanged: (value) =>

@@ -36,7 +36,7 @@ class _ProductListViewBody extends StatelessWidget {
     final vm = context.watch<ProductListViewModel>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text(AppStrings.productsTitle)),
+      appBar: AppBar(title: Text(AppStrings.productsTitle)),
       body: RefreshIndicator(
         onRefresh: vm.refresh,
         child: Column(
@@ -44,7 +44,7 @@ class _ProductListViewBody extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(AppSizes.md),
               child: TextField(
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   prefixIcon: Icon(Icons.search),
                   hintText: AppStrings.searchProductsHint,
                 ),
@@ -62,7 +62,7 @@ class _ProductListViewBody extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: AppSizes.sm),
                       child: ChoiceChip(
-                        label: const Text(AppStrings.all),
+                        label: Text(AppStrings.all),
                         selected: vm.categoryFilter == null,
                         onSelected: (_) => context
                             .read<ProductListViewModel>()
@@ -97,7 +97,7 @@ class _ProductListViewBody extends StatelessWidget {
               child: vm.isLoading && vm.products.isEmpty
                   ? const Center(child: CircularProgressIndicator())
                   : vm.products.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         AppStrings.noProductsYet,
                         style: TextStyle(color: AppColors.textSecondary),
@@ -123,7 +123,7 @@ class _ProductListViewBody extends StatelessWidget {
           }
         },
         icon: const Icon(Icons.add),
-        label: const Text(AppStrings.addProductTitle),
+        label: Text(AppStrings.addProductTitle),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -212,7 +212,7 @@ class _ProductTile extends StatelessWidget {
             ),
             if (product.isLowStock) ...[
               const SizedBox(height: AppSizes.xs),
-              const Text(
+              Text(
                 AppStrings.lowStock,
                 style: TextStyle(
                   fontSize: AppSizes.fontSizeSm,

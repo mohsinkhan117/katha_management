@@ -133,7 +133,7 @@ class _NavBar extends StatelessWidget {
                 icon: Icons.dashboard_outlined,
                 text: isCompact ? AppStrings.navHome : AppStrings.navDashboard,
               ),
-              const GButton(
+              GButton(
                 icon: Icons.receipt_long_outlined,
                 text: AppStrings.navOrders,
               ),
@@ -143,7 +143,7 @@ class _NavBar extends StatelessWidget {
                     ? AppStrings.navParties
                     : AppStrings.navCustomers,
               ),
-              const GButton(
+              GButton(
                 icon: Icons.inventory_2_outlined,
                 text: AppStrings.navProducts,
               ),
