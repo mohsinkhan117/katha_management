@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/providers/locale_provider.dart';
+import 'package:katha_management/core/providers/theme_provider.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'settings_view_model.dart';
 
@@ -103,6 +104,12 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                   _Banner(message: vm.successMessage!, isError: false),
                   const SizedBox(height: AppSizes.spaceBtwItems),
                 ],
+
+                // ─── Theme Mode Switcher ─────────────────────────────
+                _SectionTitle(title: AppStrings.themeSectionTitle),
+                const SizedBox(height: AppSizes.sm),
+                const _ThemeSelectorCard(),
+                const SizedBox(height: AppSizes.spaceBtwSections),
 
                 // ─── Language Selection ──────────────────────────────
                 _SectionTitle(title: AppStrings.languageSectionTitle),
@@ -433,6 +440,66 @@ class _Banner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ThemeSelectorCard extends StatelessWidget {
+  const _ThemeSelectorCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = themeProvider.isDarkMode;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
+        side: const BorderSide(color: AppColors.borderSecondary),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.md,
+          vertical: AppSizes.xs,
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(AppSizes.sm),
+          decoration: BoxDecoration(
+            color: (isDark ? AppColors.accent : AppColors.primary)
+                .withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppSizes.borderRadiusSm),
+          ),
+          child: Icon(
+            isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+            color: isDark ? AppColors.accent : AppColors.primary,
+          ),
+        ),
+        title: Text(
+          AppStrings.themeSectionTitle,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: AppSizes.fontSizeMd,
+          ),
+        ),
+        subtitle: Text(
+          isDark ? AppStrings.themeDarkMode : AppStrings.themeLightMode,
+          style: TextStyle(
+            color: isDark ? AppColors.accent : AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        trailing: Switch.adaptive(
+          key: const Key('theme_switch'),
+          value: isDark,
+          activeThumbColor: AppColors.accent,
+          activeTrackColor: AppColors.primary,
+          onChanged: (val) => themeProvider.setThemeMode(
+            val ? ThemeMode.dark : ThemeMode.light,
+          ),
+        ),
+        onTap: () => themeProvider.toggleTheme(),
       ),
     );
   }

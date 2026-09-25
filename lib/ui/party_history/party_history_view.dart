@@ -10,6 +10,7 @@ import 'package:katha_management/core/models/payment/payment_model.dart';
 import 'package:katha_management/core/models/sale_item_model.dart';
 import 'package:katha_management/core/models/sale_model.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
+import 'package:katha_management/core/widgets/glass_card.dart';
 import 'package:katha_management/core/utils/app_dialogs/collect_payment_sheet.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view.dart';
@@ -48,7 +49,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
     final vm = context.watch<PartyHistoryViewModel>();
 
     return Scaffold(
-      backgroundColor: AppColors.primaryBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(
           vm.party?.name ?? AppStrings.partyHistoryTitle,
@@ -97,9 +98,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
                   final deleted = await vm.deleteParty();
                   if (deleted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(AppStrings.partyDeletedSuccess),
-                      ),
+                      SnackBar(content: Text(AppStrings.partyDeletedSuccess)),
                     );
                     if (Navigator.canPop(context)) {
                       Navigator.of(context).pop(true);
@@ -137,7 +136,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
           ),
         ],
       ),
-      body: _buildBody(context, vm),
+      body: AmbientScaffoldBackground(child: _buildBody(context, vm)),
     );
   }
 
@@ -1257,9 +1256,7 @@ class _TimelineTile extends StatelessWidget {
                 );
                 if (collected == true && context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(AppStrings.paymentCollectedSuccess),
-                    ),
+                    SnackBar(content: Text(AppStrings.paymentCollectedSuccess)),
                   );
                   vm.load();
                 }

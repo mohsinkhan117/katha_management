@@ -260,5 +260,9 @@
   "selectLanguageTitle": "زبان منتخب کریں (Select Language)",
   "englishLanguage": "English",
   "urduLanguage": "اردو (Urdu)",
-  "languageChangedSuccess": "زبان کامیابی سے تبدیل ہو گئی"
+  "languageChangedSuccess": "زبان کامیابی سے تبدیل ہو گئی",
+  "themeSectionTitle": "تھیم (Theme)",
+  "themeDarkMode": "ڈارک موڈ (Dark Mode)",
+  "themeLightMode": "لائٹ موڈ (Light Mode)",
+  "themeSubtitle": "لائٹ اور ڈارک گلاس تھیم میں تبدیل کریں"
 }

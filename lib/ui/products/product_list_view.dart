@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/product/product_model.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
+import 'package:katha_management/core/widgets/glass_card.dart';
 import 'package:katha_management/ui/features/add_product/add_product_view.dart';
 import 'product_list_view_model.dart';
 
@@ -36,83 +37,89 @@ class _ProductListViewBody extends StatelessWidget {
     final vm = context.watch<ProductListViewModel>();
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: Text(AppStrings.productsTitle)),
-      body: RefreshIndicator(
-        onRefresh: vm.refresh,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSizes.md),
-              child: TextField(
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: AppStrings.searchProductsHint,
+      body: AmbientScaffoldBackground(
+        child: RefreshIndicator(
+          onRefresh: vm.refresh,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSizes.md),
+                child: TextField(
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: AppStrings.searchProductsHint,
+                  ),
+                  onChanged: (value) => context
+                      .read<ProductListViewModel>()
+                      .setSearchQuery(value),
                 ),
-                onChanged: (value) =>
-                    context.read<ProductListViewModel>().setSearchQuery(value),
               ),
-            ),
-            if (vm.categories.isNotEmpty)
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.md),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: AppSizes.sm),
-                      child: ChoiceChip(
-                        label: Text(AppStrings.all),
-                        selected: vm.categoryFilter == null,
-                        onSelected: (_) => context
-                            .read<ProductListViewModel>()
-                            .setCategoryFilter(null),
-                      ),
+              if (vm.categories.isNotEmpty)
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.md,
                     ),
-                    ...vm.categories.map(
-                      (category) => Padding(
+                    children: [
+                      Padding(
                         padding: const EdgeInsets.only(right: AppSizes.sm),
                         child: ChoiceChip(
-                          label: Text(category),
-                          selected: vm.categoryFilter == category,
+                          label: Text(AppStrings.all),
+                          selected: vm.categoryFilter == null,
                           onSelected: (_) => context
                               .read<ProductListViewModel>()
-                              .setCategoryFilter(category),
+                              .setCategoryFilter(null),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: AppSizes.sm),
-            if (vm.errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSizes.md),
-                child: Text(
-                  vm.errorMessage!,
-                  style: const TextStyle(color: AppColors.error),
-                ),
-              ),
-            Expanded(
-              child: vm.isLoading && vm.products.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : vm.products.isEmpty
-                  ? Center(
-                      child: Text(
-                        AppStrings.noProductsYet,
-                        style: TextStyle(color: AppColors.textSecondary),
+                      ...vm.categories.map(
+                        (category) => Padding(
+                          padding: const EdgeInsets.only(right: AppSizes.sm),
+                          child: ChoiceChip(
+                            label: Text(category),
+                            selected: vm.categoryFilter == category,
+                            onSelected: (_) => context
+                                .read<ProductListViewModel>()
+                                .setCategoryFilter(category),
+                          ),
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.md,
+                    ],
+                  ),
+                ),
+              const SizedBox(height: AppSizes.sm),
+              if (vm.errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.md),
+                  child: Text(
+                    vm.errorMessage!,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ),
+              Expanded(
+                child: vm.isLoading && vm.products.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : vm.products.isEmpty
+                    ? Center(
+                        child: Text(
+                          AppStrings.noProductsYet,
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.md,
+                        ),
+                        itemCount: vm.products.length,
+                        itemBuilder: (context, index) =>
+                            _ProductTile(product: vm.products[index]),
                       ),
-                      itemCount: vm.products.length,
-                      itemBuilder: (context, index) =>
-                          _ProductTile(product: vm.products[index]),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -124,7 +131,6 @@ class _ProductListViewBody extends StatelessWidget {
         },
         icon: const Icon(Icons.add),
         label: Text(AppStrings.addProductTitle),
-        backgroundColor: AppColors.primary,
       ),
     );
   }
@@ -140,12 +146,10 @@ class _ProductTile extends StatelessWidget {
         ? AppColors.success
         : AppColors.error;
 
-    return Card(
-      elevation: AppSizes.cardElevation,
+    return GlassCard(
+      borderRadius: 18,
       margin: const EdgeInsets.only(bottom: AppSizes.sm),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSizes.cardRadiusSm),
-      ),
+      padding: EdgeInsets.zero,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSizes.sm,
@@ -171,10 +175,7 @@ class _ProductTile extends StatelessWidget {
         ),
         title: Text(
           product.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
           product.hasSizes

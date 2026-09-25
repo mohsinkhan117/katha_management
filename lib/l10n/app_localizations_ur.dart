@@ -812,4 +812,16 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get languageChangedSuccess => 'زبان کامیابی سے تبدیل ہو گئی';
+
+  @override
+  String get themeSectionTitle => 'تھیم (Theme)';
+
+  @override
+  String get themeDarkMode => 'ڈارک موڈ (Dark Mode)';
+
+  @override
+  String get themeLightMode => 'لائٹ موڈ (Light Mode)';
+
+  @override
+  String get themeSubtitle => 'لائٹ اور ڈارک گلاس تھیم میں تبدیل کریں';
 }

@@ -263,5 +263,9 @@
   "selectLanguageTitle": "Select Language / زبان منتخب کریں",
   "englishLanguage": "English",
   "urduLanguage": "اردو (Urdu)",
-  "languageChangedSuccess": "Language changed successfully"
+  "languageChangedSuccess": "Language changed successfully",
+  "themeSectionTitle": "Theme / تھیم",
+  "themeDarkMode": "Dark Mode",
+  "themeLightMode": "Light Mode",
+  "themeSubtitle": "Switch between light and dark frosted glass theme"
 }

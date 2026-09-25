@@ -89,4 +89,45 @@ class AppColors {
   static const Color cardSurface = Color(0xFFFFFFFF);
   static const Color cardBackground = Color(0xFFF7F5F0);
   static const Color cardBorder = Color(0xFFE5E7EB);
+
+  // ─── Frosted Glass Tokens (iPhone Widget Style) ───────────────────────────────
+  static const Color glassFillLight = Color(0xC7FFFFFF); // 78% White
+  static const Color glassFillLightEnd = Color(0x7AFFFFFF); // 48% White
+  static const Color glassBorderLight = Color(0xD9FFFFFF); // 85% White
+  static const Color glassShadowLight = Color(0x0D1F3864); // 5% Primary Navy
+
+  static const Color glassFillDark = Color(0x14FFFFFF); // 8% White
+  static const Color glassFillDarkEnd = Color(0x08FFFFFF); // 3% White
+  static const Color glassBorderDark = Color(0x24FFFFFF); // 14% White
+  static const Color glassShadowDark = Color(0x59000000); // 35% Black
+
+  static const Gradient glassGradientLight = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [glassFillLight, glassFillLightEnd],
+  );
+
+  static const Gradient glassGradientDark = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [glassFillDark, glassFillDarkEnd],
+  );
+
+  static const Gradient scaffoldGradientDark = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF111827), Color(0xFF000000), Color(0x3316495F)],
+  );
+
+  static Gradient glassGradient(bool isDark) =>
+      isDark ? glassGradientDark : glassGradientLight;
+
+  static Color glassBorderColor(bool isDark) =>
+      isDark ? glassBorderDark : glassBorderLight;
+
+  static Color glassShadowColor(bool isDark) =>
+      isDark ? glassShadowDark : glassShadowLight;
+
+  static Gradient scaffoldGradientFor(bool isDark) =>
+      isDark ? scaffoldGradientDark : scaffoldGradient;
 }

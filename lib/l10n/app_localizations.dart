@@ -1663,6 +1663,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Language changed successfully'**
   String get languageChangedSuccess;
+
+  /// No description provided for @themeSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme / تھیم'**
+  String get themeSectionTitle;
+
+  /// No description provided for @themeDarkMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark Mode'**
+  String get themeDarkMode;
+
+  /// No description provided for @themeLightMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Light Mode'**
+  String get themeLightMode;
+
+  /// No description provided for @themeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch between light and dark frosted glass theme'**
+  String get themeSubtitle;
 }
 
 class _AppLocalizationsDelegate

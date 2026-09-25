@@ -813,4 +813,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get languageChangedSuccess => 'Language changed successfully';
+
+  @override
+  String get themeSectionTitle => 'Theme / تھیم';
+
+  @override
+  String get themeDarkMode => 'Dark Mode';
+
+  @override
+  String get themeLightMode => 'Light Mode';
+
+  @override
+  String get themeSubtitle =>
+      'Switch between light and dark frosted glass theme';
 }

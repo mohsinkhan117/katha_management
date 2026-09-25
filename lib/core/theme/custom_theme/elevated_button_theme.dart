@@ -15,14 +15,14 @@ class AppElevatedButtonTheme {
           backgroundColor: AppColors.primary,
           disabledBackgroundColor: AppColors.buttonDisabled,
           disabledForegroundColor: AppColors.darkerGrey,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           textStyle: const TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
         ).copyWith(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
@@ -58,14 +58,14 @@ class AppElevatedButtonTheme {
           backgroundColor: AppColors.primary,
           disabledBackgroundColor: AppColors.darkGrey,
           disabledForegroundColor: AppColors.grey,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           textStyle: const TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
         ).copyWith(
           backgroundColor: WidgetStateProperty.resolveWith((states) {

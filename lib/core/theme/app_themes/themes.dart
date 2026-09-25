@@ -38,12 +38,29 @@ class AppTheme {
       surface: AppColors.white,
     ),
     cardTheme: CardThemeData(
-      color: AppColors.white,
-      elevation: 2,
-      shadowColor: AppColors.softGrey,
+      color: AppColors.white.withValues(alpha: 0.82),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: const BorderSide(color: AppColors.glassBorderLight, width: 1),
+      ),
+      shadowColor: AppColors.glassShadowLight,
     ),
-
-    tabBarTheme: TabBarThemeData(
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      titleTextStyle: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    tabBarTheme: const TabBarThemeData(
       labelColor: AppColors.primary,
       unselectedLabelColor: AppColors.darkGrey,
       indicatorColor: AppColors.primary,
@@ -72,10 +89,28 @@ class AppTheme {
       onSecondary: AppColors.black,
       surface: Color(0xFF2D3748),
     ),
-    cardTheme: const CardThemeData(
-      color: Color(0xFF2D3748),
-      elevation: 2,
-      shadowColor: AppColors.black,
+    cardTheme: CardThemeData(
+      color: AppColors.white.withValues(alpha: 0.08),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: const BorderSide(color: AppColors.glassBorderDark, width: 1),
+      ),
+      shadowColor: AppColors.glassShadowDark,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: const Color(0xFF1E293B),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      titleTextStyle: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textWhite,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     tabBarTheme: const TabBarThemeData(
       labelColor: AppColors.primary,

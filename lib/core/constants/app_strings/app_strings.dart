@@ -558,4 +558,15 @@ class AppStrings {
   static String get languageChangedSuccess =>
       _localizations?.languageChangedSuccess ??
       'Language changed successfully';
+
+  // ─── Theme Switcher ───────────────────────────────────────────
+  static String get themeSectionTitle =>
+      _localizations?.themeSectionTitle ?? 'Theme / تھیم';
+  static String get themeDarkMode =>
+      _localizations?.themeDarkMode ?? 'Dark Mode';
+  static String get themeLightMode =>
+      _localizations?.themeLightMode ?? 'Light Mode';
+  static String get themeSubtitle =>
+      _localizations?.themeSubtitle ??
+      'Switch between light and dark frosted glass theme';
 }
