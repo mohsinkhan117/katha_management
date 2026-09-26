@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Documentation and Architecture PDFs
+*.pdf
+Katha_Management_v2.0_Implementation_Plan.pdf
