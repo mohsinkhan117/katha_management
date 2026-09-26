@@ -118,9 +118,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 const SizedBox(height: AppSizes.spaceBtwSections),
 
                 // ─── Business / Hotel Profile ────────────────────────
-                _SectionTitle(
-                  title: AppStrings.hotelBusinessProfileSection,
-                ),
+                _SectionTitle(title: AppStrings.hotelBusinessProfileSection),
                 const SizedBox(height: AppSizes.sm),
                 _LogoCard(
                   logoPath: vm.logoPath,
@@ -196,9 +194,7 @@ class _SettingsViewBodyState extends State<_SettingsViewBody> {
                 const SizedBox(height: AppSizes.spaceBtwSections),
 
                 // ─── Invoice & Accounting Settings ───────────────────
-                _SectionTitle(
-                  title: AppStrings.invoiceAndAccountingSection,
-                ),
+                _SectionTitle(title: AppStrings.invoiceAndAccountingSection),
                 const SizedBox(height: AppSizes.sm),
                 Row(
                   children: [
@@ -350,7 +346,6 @@ class _LogoCard extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColors.lightContainer,
                 borderRadius: BorderRadius.circular(AppSizes.borderRadiusMd),
                 border: Border.all(color: Colors.grey.shade300),
               ),
@@ -467,8 +462,9 @@ class _ThemeSelectorCard extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(AppSizes.sm),
           decoration: BoxDecoration(
-            color: (isDark ? AppColors.accent : AppColors.primary)
-                .withValues(alpha: 0.12),
+            color: (isDark ? AppColors.accent : AppColors.primary).withValues(
+              alpha: 0.12,
+            ),
             borderRadius: BorderRadius.circular(AppSizes.borderRadiusSm),
           ),
           child: Icon(
@@ -529,10 +525,7 @@ class _LanguageSelectorCard extends StatelessWidget {
             color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(AppSizes.borderRadiusSm),
           ),
-          child: const Icon(
-            Icons.language,
-            color: AppColors.primary,
-          ),
+          child: const Icon(Icons.language, color: AppColors.primary),
         ),
         title: Text(
           AppStrings.languageSectionTitle,
@@ -597,8 +590,10 @@ class _LanguageSelectorCard extends StatelessWidget {
                   ),
                   trailing: !localeProvider.isUrdu
                       ? const Icon(Icons.check_circle, color: AppColors.primary)
-                      : const Icon(Icons.radio_button_unchecked,
-                          color: AppColors.textSecondary),
+                      : const Icon(
+                          Icons.radio_button_unchecked,
+                          color: AppColors.textSecondary,
+                        ),
                   onTap: () {
                     localeProvider.setLocale(const Locale('en'));
                     Navigator.pop(ctx);
@@ -622,8 +617,10 @@ class _LanguageSelectorCard extends StatelessWidget {
                   ),
                   trailing: localeProvider.isUrdu
                       ? const Icon(Icons.check_circle, color: AppColors.primary)
-                      : const Icon(Icons.radio_button_unchecked,
-                          color: AppColors.textSecondary),
+                      : const Icon(
+                          Icons.radio_button_unchecked,
+                          color: AppColors.textSecondary,
+                        ),
                   onTap: () {
                     localeProvider.setLocale(const Locale('ur'));
                     Navigator.pop(ctx);
@@ -643,4 +640,3 @@ class _LanguageSelectorCard extends StatelessWidget {
     );
   }
 }
-

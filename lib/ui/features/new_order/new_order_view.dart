@@ -156,9 +156,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
                   final deleted = await orderVm.deleteOrder();
                   if (deleted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(AppStrings.orderDeletedSuccess),
-                      ),
+                      SnackBar(content: Text(AppStrings.orderDeletedSuccess)),
                     );
                     if (Navigator.canPop(context)) {
                       Navigator.of(context).pop(true);
@@ -231,9 +229,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
             ],
             TextField(
               controller: _partyNameController,
-              decoration: InputDecoration(
-                labelText: AppStrings.partyNameLabel,
-              ),
+              decoration: InputDecoration(labelText: AppStrings.partyNameLabel),
               onChanged: (value) =>
                   context.read<NewOrderViewModel>().setPartyManual(
                     name: value,
@@ -495,9 +491,7 @@ class _NewOrderViewBodyState extends State<_NewOrderViewBody> {
           TextField(
             controller: _noteController,
             maxLines: 2,
-            decoration: InputDecoration(
-              labelText: AppStrings.noteOptional,
-            ),
+            decoration: InputDecoration(labelText: AppStrings.noteOptional),
             onChanged: (value) =>
                 context.read<NewOrderViewModel>().setNote(value),
           ),
@@ -678,9 +672,9 @@ class _OrderProductCardWithDropdownState
               )
             : BorderSide.none,
       ),
-      color: isSelected
-          ? AppColors.secondary.withValues(alpha: 0.03)
-          : Colors.white,
+      // color: isSelected
+      //     ? AppColors.secondary.withValues(alpha: 0.03)
+      //     : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppSizes.sm),
         child: Column(
@@ -714,7 +708,6 @@ class _OrderProductCardWithDropdownState
                               ? FontWeight.bold
                               : FontWeight.w600,
                           fontSize: AppSizes.fontSizeMd,
-                          color: AppColors.textPrimary,
                         ),
                       ),
                       if (widget.product.category != null &&

@@ -209,19 +209,22 @@ class _OrdersViewBody extends StatelessWidget {
             ],
           ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () async {
-            await Navigator.pushNamed(context, NewOrderView.routeName);
-            if (context.mounted) {
-              context.read<OrderViewModel>().refresh();
-            }
-          },
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 72),
+          child: FloatingActionButton.extended(
+            onPressed: () async {
+              await Navigator.pushNamed(context, NewOrderView.routeName);
+              if (context.mounted) {
+                context.read<OrderViewModel>().refresh();
+              }
+            },
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            icon: const Icon(Icons.add),
+            label: Text(AppStrings.newOrderButton),
+            backgroundColor: AppColors.primary,
           ),
-          icon: const Icon(Icons.add),
-          label: Text(AppStrings.newOrderButton),
-          backgroundColor: AppColors.primary,
         ),
       ),
     );
@@ -795,8 +798,8 @@ class _OrderCardState extends State<_OrderCard> {
                       order.status == OrderStatus.placed
                           ? AppStrings.markDelivered
                           : (order.status == OrderStatus.delivered
-                              ? AppStrings.markPaid
-                              : (order.status.next?.label ?? 'Done')),
+                                ? AppStrings.markPaid
+                                : (order.status.next?.label ?? 'Done')),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

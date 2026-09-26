@@ -122,15 +122,18 @@ class _ProductListViewBody extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.of(context).push(AddProductView.route());
-          if (context.mounted) {
-            context.read<ProductListViewModel>().refresh();
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: Text(AppStrings.addProductTitle),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 72),
+        child: FloatingActionButton.extended(
+          onPressed: () async {
+            await Navigator.of(context).push(AddProductView.route());
+            if (context.mounted) {
+              context.read<ProductListViewModel>().refresh();
+            }
+          },
+          icon: const Icon(Icons.add),
+          label: Text(AppStrings.addProductTitle),
+        ),
       ),
     );
   }

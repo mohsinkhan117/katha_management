@@ -76,8 +76,8 @@ class _HomeViewBody extends StatelessWidget {
                     const SizedBox(height: AppSizes.spaceBtwItems),
 
                     // 2x2 Bento Small Widgets (Today's Sales & Collection)
-                    _BentoMetricsRow(vm: vm),
-                    const SizedBox(height: AppSizes.spaceBtwItems),
+                    // _BentoMetricsRow(vm: vm),
+                    // const SizedBox(height: AppSizes.spaceBtwItems),
 
                     // Quick Actions (iOS 4-Pod Action Widget)
                     const _QuickActionsWidget(),

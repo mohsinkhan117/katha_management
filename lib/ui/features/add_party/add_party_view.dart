@@ -78,7 +78,6 @@ class _AddPartyViewBodyState extends State<_AddPartyViewBody> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(
           vm.isEditing ? AppStrings.editPartyTitle : AppStrings.addPartyTitle,

@@ -49,7 +49,7 @@ class _PartyHistoryViewBody extends StatelessWidget {
     final vm = context.watch<PartyHistoryViewModel>();
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      // backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(
           vm.party?.name ?? AppStrings.partyHistoryTitle,
@@ -224,7 +224,6 @@ class _BalanceHeader extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
                       ),
                     ),
                   ),
@@ -238,7 +237,6 @@ class _BalanceHeader extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: AppSizes.fontSizeLg,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -776,7 +774,6 @@ class _TimelineTile extends StatelessWidget {
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: AppSizes.fontSizeMd,
-                    color: AppColors.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -789,7 +786,7 @@ class _TimelineTile extends StatelessWidget {
                   fontSize: AppSizes.fontSizeMd,
                   color: entry.type == PartyHistoryEntryType.payment
                       ? AppColors.success
-                      : AppColors.textPrimary,
+                      : AppColors.secondary,
                 ),
               ),
             ],
