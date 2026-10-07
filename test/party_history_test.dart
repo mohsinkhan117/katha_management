@@ -15,7 +15,7 @@ import 'package:katha_management/features/party/data/repositories/party_reposito
 import 'package:katha_management/features/payment/data/repositories/payment_repository.dart';
 import 'package:katha_management/features/sale/data/repositories/sale_repository.dart';
 import 'package:katha_management/features/settings/data/repositories/settings_repository.dart';
-import 'package:katha_management/ui/party_history/party_history_view_model.dart';
+import 'package:katha_management/ui/distributer/party_history/party_history_view_model.dart';
 
 class MockPartyRepo implements PartyRepository {
   final PartyModel? party;

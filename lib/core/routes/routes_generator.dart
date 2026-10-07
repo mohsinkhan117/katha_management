@@ -2,18 +2,18 @@
 
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/models/product/product_model.dart';
-import 'package:katha_management/ui/customers/customers_view.dart';
+import 'package:katha_management/ui/distributer/customers/customers_view.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view.dart';
 import 'package:katha_management/ui/features/add_product/add_product_view.dart';
-import 'package:katha_management/ui/dashboard/dashboard_view.dart';
-import 'package:katha_management/ui/navigation_bar/gnav_bar_view.dart';
+import 'package:katha_management/ui/distributer/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/distributer/navigation_bar/gnav_bar_view.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
-import 'package:katha_management/ui/orders/orders_view.dart';
-import 'package:katha_management/ui/party_history/party_history_view.dart';
+import 'package:katha_management/ui/distributer/orders/orders_view.dart';
+import 'package:katha_management/ui/distributer/party_history/party_history_view.dart';
 import 'package:katha_management/ui/products/product_list_view.dart';
-import 'package:katha_management/ui/settings_view/settings_view.dart';
+import 'package:katha_management/ui/distributer/settings_view/settings_view.dart';
 
 class RouterGenerator {
   static Route onGenerateRoute(RouteSettings settings) {

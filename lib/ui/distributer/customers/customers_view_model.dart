@@ -5,8 +5,8 @@ import 'package:katha_management/core/models/party_model.dart';
 import 'package:katha_management/features/party/data/repositories/party_repository.dart';
 import 'package:katha_management/features/party/data/repositories/sqflite_party_repository.dart';
 
-import '../../core/models/party_balance_summary.dart';
-import '../../core/services/party_balance_service.dart';
+import '../../../core/models/party_balance_summary.dart';
+import '../../../core/services/party_balance_service.dart';
 
 /// Feeds the Customers screen: every party plus their live balance,
 /// with a simple name/phone filter.

@@ -6,9 +6,9 @@ import 'package:katha_management/ui/products/product_list_view.dart';
 import 'package:provider/provider.dart';
 
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
-import 'package:katha_management/ui/customers/customers_view.dart';
-import 'package:katha_management/ui/dashboard/dashboard_view.dart';
-import 'package:katha_management/ui/orders/orders_view.dart';
+import 'package:katha_management/ui/distributer/customers/customers_view.dart';
+import 'package:katha_management/ui/distributer/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/distributer/orders/orders_view.dart';
 
 import 'gnav_bar_view_model.dart';
 

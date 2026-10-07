@@ -6,8 +6,8 @@ import 'package:katha_management/core/models/new_order/new_order_model.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
 import 'package:katha_management/features/order/data/repositories/order_repository.dart';
 import 'package:katha_management/l10n/app_localizations.dart';
-import 'package:katha_management/ui/orders/order_view_model.dart';
-import 'package:katha_management/ui/orders/orders_view.dart';
+import 'package:katha_management/ui/distributer/orders/order_view_model.dart';
+import 'package:katha_management/ui/distributer/orders/orders_view.dart';
 
 class _FakeOrderRepository implements OrderRepository {
   final List<OrderModel> orders = [];

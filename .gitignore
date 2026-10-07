@@ -47,6 +47,19 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# Documentation and Architecture PDFs
+# Documentation and Architecture PDFs / Word Exports
 *.pdf
+*.doc
+*.docx
 Katha_Management_v2.0_Implementation_Plan.pdf
+
+# Next.js Web Panels (company-web & admin-web)
+**/node_modules/
+**/.next/
+**/out/
+**/.env
+**/.env.local
+**/.env.*.local
+**/next-env.d.ts
+*.tsbuildinfo
+

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
-import 'package:katha_management/ui/customers/customers_view.dart';
-import 'package:katha_management/ui/dashboard/dashboard_view.dart';
+import 'package:katha_management/ui/distributer/customers/customers_view.dart';
+import 'package:katha_management/ui/distributer/dashboard/dashboard_view.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
-import 'package:katha_management/ui/orders/orders_view.dart';
+import 'package:katha_management/ui/distributer/orders/orders_view.dart';
 
 class NavigationBarView extends StatefulWidget {
   static const String routeName = '/navigation-bar-view';

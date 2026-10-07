@@ -6,7 +6,7 @@ import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/providers/locale_provider.dart';
 import 'package:katha_management/core/providers/theme_provider.dart';
 import 'package:katha_management/core/theme/app_themes/themes.dart';
-import 'package:katha_management/ui/settings_view/settings_view.dart';
+import 'package:katha_management/ui/distributer/settings_view/settings_view.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

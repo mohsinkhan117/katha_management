@@ -6,9 +6,9 @@ import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/party_balance_summary.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'package:katha_management/core/widgets/glass_card.dart';
-import 'package:katha_management/ui/customers/customers_view_model.dart';
+import 'package:katha_management/ui/distributer/customers/customers_view_model.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
-import 'package:katha_management/ui/party_history/party_history_view.dart';
+import 'package:katha_management/ui/distributer/party_history/party_history_view.dart';
 import 'package:provider/provider.dart';
 
 class CustomersView extends StatelessWidget {

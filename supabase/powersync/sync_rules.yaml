@@ -1,0 +1,21 @@
+# PowerSync Sync Rules for Katha Management v2.0
+# Synchronizes Company Catalog and Territory-Scoped Data to the Flutter Distributor App
+
+bucket_definitions:
+  company_catalog:
+    parameters:
+      - SELECT company_id FROM user_profiles WHERE id = token_parameters.user_id() AND is_active = true
+    data:
+      - SELECT * FROM products WHERE company_id = bucket.company_id
+      - SELECT * FROM product_sizes WHERE company_id = bucket.company_id
+      - SELECT * FROM territories WHERE company_id = bucket.company_id
+
+  distributor_territory_data:
+    parameters:
+      - SELECT territory_id, company_id FROM distributor_territories WHERE distributor_id = token_parameters.user_id()
+    data:
+      - SELECT * FROM parties WHERE company_id = bucket.company_id AND territory_id = bucket.territory_id
+      - SELECT * FROM orders WHERE company_id = bucket.company_id AND territory_id = bucket.territory_id
+      - SELECT * FROM order_items WHERE company_id = bucket.company_id
+      - SELECT * FROM ledger_entries WHERE company_id = bucket.company_id
+

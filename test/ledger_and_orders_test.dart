@@ -15,11 +15,11 @@ import 'package:katha_management/features/party/data/repositories/party_reposito
 import 'package:katha_management/features/payment/data/repositories/payment_repository.dart';
 import 'package:katha_management/features/product/data/repositories/product_repository.dart';
 import 'package:katha_management/features/sale/data/repositories/sale_repository.dart';
-import 'package:katha_management/ui/customers/customers_view_model.dart';
+import 'package:katha_management/ui/distributer/customers/customers_view_model.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view_model.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view_model.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view_model.dart';
-import 'package:katha_management/ui/orders/order_view_model.dart';
+import 'package:katha_management/ui/distributer/orders/order_view_model.dart';
 
 class MockPartyRepository implements PartyRepository {
   final List<PartyModel> parties = [];

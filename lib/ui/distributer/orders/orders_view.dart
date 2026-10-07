@@ -7,7 +7,7 @@ import 'package:katha_management/core/theme/app_colors/app_colors.dart';
 import 'package:katha_management/core/utils/app_dialogs/collect_payment_sheet.dart';
 import 'package:katha_management/core/widgets/glass_card.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
-import 'package:katha_management/ui/orders/order_view_model.dart';
+import 'package:katha_management/ui/distributer/orders/order_view_model.dart';
 import 'package:provider/provider.dart';
 
 class OrdersView extends StatelessWidget {

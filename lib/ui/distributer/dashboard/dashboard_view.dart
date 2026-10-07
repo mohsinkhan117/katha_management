@@ -6,13 +6,13 @@ import 'package:katha_management/core/constants/app_strings/app_strings.dart';
 import 'package:katha_management/core/constants/sizes/sizes.dart';
 import 'package:katha_management/core/models/party_balance_summary.dart';
 import 'package:katha_management/core/theme/app_colors/app_colors.dart';
-import 'package:katha_management/ui/dashboard/dashboard_view_model.dart';
+import 'package:katha_management/ui/distributer/dashboard/dashboard_view_model.dart';
 import 'package:katha_management/ui/features/add_party/add_party_view.dart';
 import 'package:katha_management/ui/features/add_payment/payment_view.dart';
 import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
-import 'package:katha_management/ui/party_history/party_history_view.dart';
-import 'package:katha_management/ui/settings_view/settings_view.dart';
+import 'package:katha_management/ui/distributer/party_history/party_history_view.dart';
+import 'package:katha_management/ui/distributer/settings_view/settings_view.dart';
 import 'package:katha_management/core/widgets/glass_card.dart';
 import 'package:provider/provider.dart';
 
