@@ -14,6 +14,7 @@ import {
   ChevronRight,
   X,
   Gauge,
+  LogOut,
 } from "lucide-react";
 
 interface NavItem {
@@ -181,7 +182,10 @@ export function AdminSidebar({
 
         {/* Footer with collapse toggle */}
         <div className="p-3 border-t border-slate-800 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
+          <Link
+            href="/handler/account-settings"
+            className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition"
+          >
             <div className="w-9 h-9 rounded-full bg-slate-800 text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0 ring-1 ring-emerald-500/40">
               SA
             </div>
@@ -195,7 +199,17 @@ export function AdminSidebar({
                 </span>
               </div>
             )}
-          </div>
+          </Link>
+
+          {(!isCollapsed || isMobileOpen) && (
+            <Link
+              href="/handler/sign-out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-900 transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </Link>
+          )}
 
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}

@@ -12,6 +12,7 @@ import 'package:katha_management/ui/features/new_order/new_order_view.dart';
 import 'package:katha_management/ui/features/new_sale/new_sale_view.dart';
 import 'package:katha_management/ui/distributer/orders/orders_view.dart';
 import 'package:katha_management/ui/distributer/party_history/party_history_view.dart';
+import 'package:katha_management/ui/distributer/auth/distributor_auth_view.dart';
 import 'package:katha_management/ui/products/product_list_view.dart';
 import 'package:katha_management/ui/distributer/settings_view/settings_view.dart';
 
@@ -20,6 +21,12 @@ class RouterGenerator {
     debugPrint("Navigating to: ${settings.name}");
 
     switch (settings.name) {
+      // ======================================================
+      // Auth & Onboarding
+      // ======================================================
+      case DistributorAuthView.routeName:
+        return DistributorAuthView.route();
+
       // ======================================================
       // Core
       // ======================================================
