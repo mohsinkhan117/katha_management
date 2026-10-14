@@ -57,3 +57,5 @@ migrate_working_dir/
 *.doc
 *.docx
 
+.neon
+node_modules/
