@@ -4,7 +4,7 @@
   "private": true,
   "description": "Katha Management - Super Admin Web Panel (SaaS Tenant & Subscription Control)",
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port 3001", 
     "build": "next build",
     "start": "next start --port 3001",
     "lint": "next lint"
