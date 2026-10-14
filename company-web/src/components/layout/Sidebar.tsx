@@ -18,6 +18,7 @@ import {
   LogOut,
   Building2,
 } from "lucide-react";
+import { useTenant } from "@/context/TenantContext";
 
 interface NavItem {
   label: string;
@@ -83,6 +84,7 @@ export function Sidebar({
   setIsMobileOpen,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { activeTenant } = useTenant();
 
   const isRouteActive = (href: string) => {
     if (href === "/") {
@@ -122,10 +124,10 @@ export function Sidebar({
             {(!isCollapsed || isMobileOpen) && (
               <div className="flex flex-col min-w-0">
                 <span className="font-bold text-white text-base tracking-tight truncate">
-                  Katha Portal
+                  {activeTenant?.name || "Katha Portal"}
                 </span>
                 <span className="text-[11px] font-medium text-blue-400 uppercase tracking-wider">
-                  Company Admin
+                  @{activeTenant?.slug || "company"}
                 </span>
               </div>
             )}
@@ -228,10 +230,10 @@ export function Sidebar({
             {(!isCollapsed || isMobileOpen) && (
               <div className="flex flex-col min-w-0">
                 <span className="text-sm font-semibold text-white truncate">
-                  Company Admin
+                  {activeTenant?.name || "Company Admin"}
                 </span>
                 <span className="text-[11px] text-slate-400 truncate">
-                  tenant@katha.com
+                  {activeTenant?.admin_email || "tenant@katha.com"}
                 </span>
               </div>
             )}

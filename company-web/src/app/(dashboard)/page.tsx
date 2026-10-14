@@ -13,9 +13,11 @@ import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { Sparkles, Download, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
+import { useTenant } from "@/context/TenantContext";
 
 export default function CompanyExecutiveDashboard() {
   const [timeframe, setTimeframe] = useState<Timeframe>("daily");
+  const { activeTenant } = useTenant();
 
   const currentDataset = dashboardDatasets[timeframe];
   const { metrics, chartData, collectionsBreakdown, orderStatuses, topProducts, recentTransactions, dateRange, periodLabel } = currentDataset;
@@ -34,7 +36,7 @@ export default function CompanyExecutiveDashboard() {
             Commercial Operations Control
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-            Apex Agro Chemical Ltd.
+            {activeTenant?.name || "Apex Agro Chemical Ltd."}
           </h1>
           <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
             Live telemetry of field orders, multi-party khata collections, and profit velocity across your registered territories.

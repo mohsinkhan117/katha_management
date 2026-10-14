@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { StackProvider, StackTheme } from "@stackframe/stack";
 import { stackServerApp } from "../stack";
+import { TenantProvider } from "@/context/TenantContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,7 +20,9 @@ export default function RootLayout({
       <body className="antialiased min-h-screen">
         <StackProvider app={stackServerApp}>
           <StackTheme>
-            {children}
+            <TenantProvider>
+              {children}
+            </TenantProvider>
           </StackTheme>
         </StackProvider>
       </body>
