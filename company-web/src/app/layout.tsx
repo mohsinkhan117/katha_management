@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { StackProvider, StackTheme } from "@stackframe/stack";
 import { stackServerApp } from "../stack";
@@ -20,9 +21,11 @@ export default function RootLayout({
       <body className="antialiased min-h-screen">
         <StackProvider app={stackServerApp}>
           <StackTheme>
-            <TenantProvider>
-              {children}
-            </TenantProvider>
+            <Suspense fallback={null}>
+              <TenantProvider>
+                {children}
+              </TenantProvider>
+            </Suspense>
           </StackTheme>
         </StackProvider>
       </body>

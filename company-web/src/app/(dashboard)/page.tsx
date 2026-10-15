@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { dashboardDatasets } from "@/components/dashboard/mockData";
-import { Timeframe } from "@/components/dashboard/types";
+import { dashboardDatasets, createEmptyDashboardDataset } from "@/components/dashboard/mockData";
+import { Timeframe, RecentTransaction } from "@/components/dashboard/types";
 import { TimeframeFilter } from "@/components/dashboard/TimeframeFilter";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { SalesProfitChart } from "@/components/dashboard/SalesProfitChart";
@@ -11,15 +11,61 @@ import { OrdersBreakdown } from "@/components/dashboard/OrdersBreakdown";
 import { TopProducts } from "@/components/dashboard/TopProducts";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { Sparkles, Download, ArrowUpRight } from "lucide-react";
+import { Sparkles, Download, ArrowUpRight, ShieldCheck, Database, Info } from "lucide-react";
 import Link from "next/link";
 import { useTenant } from "@/context/TenantContext";
 
 export default function CompanyExecutiveDashboard() {
   const [timeframe, setTimeframe] = useState<Timeframe>("daily");
-  const { activeTenant } = useTenant();
+  const { activeTenant, tenantData, hasAccess, isCustomTenant } = useTenant();
 
-  const currentDataset = dashboardDatasets[timeframe];
+  // Rule logic:
+  // 1. If tenant has access and is a real tenant in DB:
+  //    - If it's a new/custom tenant: show REAL DB data (0 if no orders have been placed yet, never fake demo numbers)
+  //    - If it's the demo sandbox tenant (Apex Agro): show the sandbox demo dataset
+  // 2. If user does NOT have access to any tenant (unauthorized): show dummy/sandbox dataset as demo fallback.
+  let currentDataset = dashboardDatasets[timeframe];
+
+  if (hasAccess && isCustomTenant) {
+    // Generate isolated dataset from real Neon records
+    const empty = createEmptyDashboardDataset(
+      timeframe === "daily" ? "Today" : timeframe === "weekly" ? "This Week" : "This Month"
+    );
+
+    if (tenantData && tenantData.orders.length > 0) {
+      // Build dataset with actual Neon numbers
+      const m = tenantData.metrics;
+      empty.metrics.sales.numericValue = m.totalSales;
+      empty.metrics.sales.value = `Rs. ${m.totalSales.toLocaleString()}`;
+      empty.metrics.profit.numericValue = m.totalProfit;
+      empty.metrics.profit.value = `Rs. ${m.totalProfit.toLocaleString()}`;
+      empty.metrics.collections.numericValue = m.totalPaid;
+      empty.metrics.collections.value = `Rs. ${m.totalPaid.toLocaleString()}`;
+      empty.metrics.orders.numericValue = m.totalOrders;
+      empty.metrics.orders.value = `${m.totalOrders} Orders`;
+      empty.collectionsBreakdown.cash = m.totalPaid;
+      empty.collectionsBreakdown.outstandingReceivables = Math.max(0, m.totalSales - m.totalPaid);
+
+      // Map real transactions
+      empty.recentTransactions = tenantData.orders.slice(0, 5).map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        partyName: o.partyName,
+        distributorName: o.distributorName || "Field Agent",
+        amount: Number(o.totalAmount),
+        status: (o.status === "Delivered" || o.status === "Completed"
+          ? "Completed"
+          : o.status === "In Transit"
+          ? "Processing"
+          : "Pending") as RecentTransaction["status"],
+        type: "Order" as const,
+        time: new Date(o.date).toLocaleDateString(),
+      }));
+    }
+
+    currentDataset = empty;
+  }
+
   const { metrics, chartData, collectionsBreakdown, orderStatuses, topProducts, recentTransactions, dateRange, periodLabel } = currentDataset;
 
   return (
@@ -33,13 +79,15 @@ export default function CompanyExecutiveDashboard() {
         <div className="relative z-10">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-            Commercial Operations Control
+            {isCustomTenant ? "Tenant Isolated Production DB" : "Commercial Operations Control"}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
             {activeTenant?.name || "Apex Agro Chemical Ltd."}
           </h1>
           <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-xl">
-            Live telemetry of field orders, multi-party khata collections, and profit velocity across your registered territories.
+            {isCustomTenant
+              ? "Live isolated telemetry for this organization. New dispatches and field claims reflect in real time."
+              : "Live telemetry of field orders, multi-party khata collections, and profit velocity across your registered territories."}
           </p>
         </div>
 
@@ -61,6 +109,32 @@ export default function CompanyExecutiveDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* No Access / Demo Fallback Banner */}
+      {!hasAccess && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 text-xs">
+          <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold text-sm">Demo / Sandbox Mode (No Active Tenant Access)</div>
+            <p className="text-amber-700 mt-0.5">
+              Your logged-in account is not associated with any active company tenant. Displaying simulated demo figures for preview.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tenant Isolation Banner Note for new organizations */}
+      {hasAccess && isCustomTenant && (!tenantData || tenantData.orders.length === 0) && (
+        <div className="p-4 bg-blue-50 border border-blue-200/80 rounded-2xl flex items-start gap-3 text-blue-900 text-xs">
+          <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold text-sm">Tenant Database Initialized</div>
+            <p className="text-blue-700 mt-0.5">
+              You are signed in to <span className="font-semibold">{activeTenant?.name}</span>. Currently there are 0 orders recorded in Neon PostgreSQL for this tenant. Issue 12-character invite tokens to field distributors to start capturing orders.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Timeframe Selector & Date Range Indicator */}
       <TimeframeFilter
@@ -111,4 +185,3 @@ export default function CompanyExecutiveDashboard() {
     </div>
   );
 }
-

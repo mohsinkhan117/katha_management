@@ -84,7 +84,57 @@ export function Sidebar({
   setIsMobileOpen,
 }: SidebarProps) {
   const pathname = usePathname();
-  const { activeTenant } = useTenant();
+  const { activeTenant, tenantData, isCustomTenant, hasAccess } = useTenant();
+
+  const ordersCount = isCustomTenant && hasAccess
+    ? tenantData?.orders?.length || 0
+    : 8;
+
+  const distributorsCount = isCustomTenant && hasAccess
+    ? tenantData?.distributors?.length || 0
+    : 12;
+
+  const dynamicNavItems: NavItem[] = [
+    {
+      label: "Dashboard",
+      href: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      label: "B2B Orders",
+      href: "/orders",
+      icon: ShoppingBag,
+      badge: ordersCount > 0 ? `${ordersCount} New` : undefined,
+      badgeColor: "bg-blue-500/10 text-blue-400 border border-blue-500/30",
+    },
+    {
+      label: "Product Catalog",
+      href: "/products",
+      icon: Package,
+    },
+    {
+      label: "Parties & Khata",
+      href: "/parties",
+      icon: BookOpen,
+    },
+    {
+      label: "Distributors",
+      href: "/distributors",
+      icon: Users,
+      badge: distributorsCount > 0 ? `${distributorsCount} Active` : undefined,
+      badgeColor: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30",
+    },
+    {
+      label: "Territories",
+      href: "/territories",
+      icon: MapPin,
+    },
+    {
+      label: "Settings",
+      href: "/settings",
+      icon: Settings,
+    },
+  ];
 
   const isRouteActive = (href: string) => {
     if (href === "/") {
@@ -153,7 +203,7 @@ export function Sidebar({
             Main Menu
           </div>
 
-          {navItems.map((item) => {
+          {dynamicNavItems.map((item) => {
             const active = isRouteActive(item.href);
             const Icon = item.icon;
 

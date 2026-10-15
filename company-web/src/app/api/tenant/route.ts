@@ -61,7 +61,9 @@ export async function GET(req: NextRequest) {
         slug,
         admin_email,
         phone,
+        address,
         plan_tier,
+        max_distributors,
         is_active
       FROM companies
       WHERE is_active = true
@@ -79,3 +81,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+

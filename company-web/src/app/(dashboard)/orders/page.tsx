@@ -95,11 +95,37 @@ const mockOrders: OrderItem[] = [
   },
 ];
 
+import { useTenant } from "@/context/TenantContext";
+
 export default function CompanyOrdersPage() {
+  const { activeTenant, tenantData, hasAccess, isCustomTenant } = useTenant();
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const filteredOrders = mockOrders.filter((order) => {
+  // Rule logic:
+  // Custom database tenants see only their actual orders (0 if clean).
+  // Sandbox/demo fallback only when no access or sandbox.
+  let effectiveOrders: OrderItem[] = mockOrders;
+
+  if (hasAccess && isCustomTenant) {
+    if (tenantData && tenantData.orders) {
+      effectiveOrders = tenantData.orders.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        partyName: o.partyName,
+        distributorName: o.distributorName || "Field Agent",
+        itemsCount: o.itemsCount || 1,
+        totalAmount: Number(o.totalAmount || 0),
+        paidAmount: Number(o.paidAmount || 0),
+        status: (o.status as any) || "Pending",
+        date: new Date(o.date).toLocaleDateString(),
+      }));
+    } else {
+      effectiveOrders = [];
+    }
+  }
+
+  const filteredOrders = effectiveOrders.filter((order) => {
     const matchesStatus =
       filterStatus === "all" || order.status.toLowerCase() === filterStatus.toLowerCase();
     const matchesSearch =
@@ -144,6 +170,19 @@ export default function CompanyOrdersPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+      {/* No Access / Demo Banner */}
+      {!hasAccess && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 text-xs">
+          <ShoppingBag className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold text-sm">Demo / Sandbox Mode (No Active Tenant)</div>
+            <p className="text-amber-700 mt-0.5">
+              Your account is not linked to an active company tenant. Displaying simulated purchase orders.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -213,51 +252,84 @@ export default function CompanyOrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredOrders.map((ord) => (
-                <tr key={ord.id} className="hover:bg-slate-50/80 transition group">
-                  <td className="py-3 px-4">
-                    <div className="font-bold text-slate-900 font-mono">
-                      {ord.orderNumber}
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 px-4 text-center">
+                    <div className="max-w-sm mx-auto flex flex-col items-center justify-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+                        <ShoppingBag className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm font-bold text-slate-800">
+                          {effectiveOrders.length === 0
+                            ? "No orders received yet"
+                            : "No matching orders found"}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {effectiveOrders.length === 0
+                            ? "As your registered field distributors take and sync purchase orders from stores, they will automatically appear here."
+                            : "Try adjusting your search terms or status filters."}
+                        </p>
+                      </div>
+                      {effectiveOrders.length === 0 && (
+                        <button
+                          onClick={() => alert("Open New Order Modal")}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Record First Order
+                        </button>
+                      )}
                     </div>
-                    <div className="text-[10px] text-slate-400">{ord.date}</div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="font-semibold text-slate-800">{ord.partyName}</div>
-                  </td>
-                  <td className="py-3 px-4 text-slate-600">
-                    {ord.distributorName}
-                  </td>
-                  <td className="py-3 px-4 text-center font-medium text-slate-700">
-                    {ord.itemsCount} SKUs
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-slate-900">
-                    Rs. {ord.totalAmount.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    {ord.totalAmount - ord.paidAmount > 0 ? (
-                      <span className="text-amber-700 font-semibold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                        Due: Rs. {(ord.totalAmount - ord.paidAmount).toLocaleString()}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700 font-semibold text-[11px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        Paid Full
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {getStatusBadge(ord.status)}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={() => alert(`View details for ${ord.orderNumber}`)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
-                      title="View Invoice"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredOrders.map((ord) => (
+                  <tr key={ord.id} className="hover:bg-slate-50/80 transition group">
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-slate-900 font-mono">
+                        {ord.orderNumber}
+                      </div>
+                      <div className="text-[10px] text-slate-400">{ord.date}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-slate-800">{ord.partyName}</div>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600">
+                      {ord.distributorName}
+                    </td>
+                    <td className="py-3 px-4 text-center font-medium text-slate-700">
+                      {ord.itemsCount} SKUs
+                    </td>
+                    <td className="py-3 px-4 text-right font-bold text-slate-900">
+                      Rs. {ord.totalAmount.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      {ord.totalAmount - ord.paidAmount > 0 ? (
+                        <span className="text-amber-700 font-semibold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          Due: Rs. {(ord.totalAmount - ord.paidAmount).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-700 font-semibold text-[11px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          Paid Full
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {getStatusBadge(ord.status)}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        onClick={() => alert(`View details for ${ord.orderNumber}`)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                        title="View Invoice"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

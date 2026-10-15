@@ -509,3 +509,89 @@ export const dashboardDatasets: Record<Timeframe, DashboardDataset> = {
   },
 };
 
+/**
+ * Clean zero-data state for newly provisioned or isolated tenants.
+ * Reflects genuine empty database tables rather than sandbox demo figures.
+ */
+export function createEmptyDashboardDataset(periodLabel: string = "Today"): DashboardDataset {
+  return {
+    periodLabel,
+    dateRange: "Current Commercial Period",
+    metrics: {
+      sales: {
+        title: "Total Sales",
+        value: "Rs. 0",
+        numericValue: 0,
+        changePercent: 0,
+        isPositive: true,
+        comparedTo: "No prior periods",
+        subText: "Cash: Rs. 0 • Credit: Rs. 0",
+        secondaryMetric: {
+          label: "Target Progress",
+          value: "0% of quota",
+        },
+      },
+      profit: {
+        title: "Net Profit",
+        value: "Rs. 0",
+        numericValue: 0,
+        changePercent: 0,
+        isPositive: true,
+        comparedTo: "No prior periods",
+        subText: "Gross Margin: 0.0%",
+        secondaryMetric: {
+          label: "COGS",
+          value: "Rs. 0",
+        },
+      },
+      collections: {
+        title: "Collections",
+        value: "Rs. 0",
+        numericValue: 0,
+        changePercent: 0,
+        isPositive: true,
+        comparedTo: "No prior periods",
+        subText: "Recovery Rate: 0.0%",
+        secondaryMetric: {
+          label: "Pending Dues",
+          value: "Rs. 0",
+        },
+      },
+      orders: {
+        title: "Total Orders",
+        value: "0 Orders",
+        numericValue: 0,
+        changePercent: 0,
+        isPositive: true,
+        comparedTo: "No prior periods",
+        subText: "Avg. Ticket: Rs. 0",
+        secondaryMetric: {
+          label: "Fulfillment",
+          value: "0 Dispatched, 0 Queued",
+        },
+      },
+    },
+    chartData: [
+      { label: "08:00 AM", sales: 0, profit: 0, collections: 0, orders: 0 },
+      { label: "12:00 PM", sales: 0, profit: 0, collections: 0, orders: 0 },
+      { label: "04:00 PM", sales: 0, profit: 0, collections: 0, orders: 0 },
+      { label: "08:00 PM", sales: 0, profit: 0, collections: 0, orders: 0 },
+    ],
+    orderStatuses: [
+      { status: "Delivered", count: 0, percentage: 0, color: "bg-emerald-500" },
+      { status: "In Transit", count: 0, percentage: 0, color: "bg-blue-500" },
+      { status: "Pending", count: 0, percentage: 0, color: "bg-amber-500" },
+      { status: "Cancelled", count: 0, percentage: 0, color: "bg-rose-500" },
+    ],
+    collectionsBreakdown: {
+      cash: 0,
+      bankTransfer: 0,
+      cheque: 0,
+      outstandingReceivables: 0,
+      collectionEfficiency: 0,
+    },
+    topProducts: [],
+    recentTransactions: [],
+  };
+}
+
