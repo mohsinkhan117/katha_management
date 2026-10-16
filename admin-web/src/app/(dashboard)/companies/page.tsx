@@ -54,7 +54,7 @@ export default function AdminCompaniesPage() {
   const fetchCompanies = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/companies");
+      const res = await fetch("/admin/api/companies");
       const json = await res.json();
       if (json.success) {
         setCompanies(json.companies || []);
@@ -116,7 +116,7 @@ export default function AdminCompaniesPage() {
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/companies", {
+      const res = await fetch("/admin/api/companies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: jsonEncodeSafe(formData),
@@ -149,7 +149,7 @@ export default function AdminCompaniesPage() {
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const res = await fetch("/api/companies", {
+      const res = await fetch("/admin/api/companies", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, isActive: !currentStatus }),
@@ -337,7 +337,7 @@ export default function AdminCompaniesPage() {
                 </button>
 
                 <a
-                  href={`http://localhost:3000`}
+                  href={process.env.NEXT_PUBLIC_COMPANY_WEB_URL || (typeof window !== "undefined" && window.location.hostname !== "localhost" ? "/" : "http://localhost:3000")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition"

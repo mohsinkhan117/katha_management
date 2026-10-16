@@ -1,0 +1,44 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "admin-web": {
+      "root": "admin-web",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "company-web",
+          "format": "url",
+          "env": "COMPANY_WEB_URL"
+        }
+      ]
+    },
+    "company-web": {
+      "root": "company-web",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "admin-web",
+          "format": "url",
+          "env": "ADMIN_WEB_URL"
+        }
+      ]
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": { "service": "admin-web" }
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": { "service": "admin-web" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "company-web" }
+    }
+  ]
+}
+
