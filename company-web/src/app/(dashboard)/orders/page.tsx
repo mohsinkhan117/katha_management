@@ -13,6 +13,8 @@ import {
   XCircle,
   FileText,
 } from "lucide-react";
+import { useTenant } from "@/context/TenantContext";
+import { NewOrderModal } from "@/components/dashboard/DashboardModals";
 
 interface OrderItem {
   id: string;
@@ -26,104 +28,24 @@ interface OrderItem {
   date: string;
 }
 
-const mockOrders: OrderItem[] = [
-  {
-    id: "ord-1",
-    orderNumber: "ORD-2026-1049",
-    partyName: "Madina Kiryana Store",
-    distributorName: "Ali Hassan (Lahore East)",
-    itemsCount: 14,
-    totalAmount: 34500,
-    paidAmount: 34500,
-    status: "Delivered",
-    date: "14 Oct 2026, 10:20 AM",
-  },
-  {
-    id: "ord-2",
-    orderNumber: "ORD-2026-1048",
-    partyName: "Al-Rehman Traders",
-    distributorName: "Tariq Mehmood (Gujranwala)",
-    itemsCount: 8,
-    totalAmount: 18200,
-    paidAmount: 10000,
-    status: "In Transit",
-    date: "14 Oct 2026, 09:45 AM",
-  },
-  {
-    id: "ord-3",
-    orderNumber: "ORD-2026-1047",
-    partyName: "Ittehad Super Store",
-    distributorName: "Ali Hassan (Lahore East)",
-    itemsCount: 22,
-    totalAmount: 41800,
-    paidAmount: 0,
-    status: "Pending",
-    date: "14 Oct 2026, 08:30 AM",
-  },
-  {
-    id: "ord-4",
-    orderNumber: "ORD-2026-1046",
-    partyName: "Bismillah General Mart",
-    distributorName: "Zubair Khan (Faisalabad)",
-    itemsCount: 30,
-    totalAmount: 85000,
-    paidAmount: 85000,
-    status: "Delivered",
-    date: "13 Oct 2026, 04:15 PM",
-  },
-  {
-    id: "ord-5",
-    orderNumber: "ORD-2026-1045",
-    partyName: "Punjab Traders & Agency",
-    distributorName: "Ali Hassan (Lahore East)",
-    itemsCount: 35,
-    totalAmount: 88400,
-    paidAmount: 50000,
-    status: "Delivered",
-    date: "13 Oct 2026, 02:00 PM",
-  },
-  {
-    id: "ord-6",
-    orderNumber: "ORD-2026-1044",
-    partyName: "Chaudhry & Sons Wholesalers",
-    distributorName: "Imran Sadiq (Sialkot)",
-    itemsCount: 16,
-    totalAmount: 39600,
-    paidAmount: 0,
-    status: "Cancelled",
-    date: "13 Oct 2026, 11:10 AM",
-  },
-];
-
-import { useTenant } from "@/context/TenantContext";
-
 export default function CompanyOrdersPage() {
-  const { activeTenant, tenantData, hasAccess, isCustomTenant } = useTenant();
+  const { activeTenant, tenantData } = useTenant();
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Rule logic:
-  // Custom database tenants see only their actual orders (0 if clean).
-  // Sandbox/demo fallback only when no access or sandbox.
-  let effectiveOrders: OrderItem[] = mockOrders;
-
-  if (hasAccess && isCustomTenant) {
-    if (tenantData && tenantData.orders) {
-      effectiveOrders = tenantData.orders.map((o) => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        partyName: o.partyName,
-        distributorName: o.distributorName || "Field Agent",
-        itemsCount: o.itemsCount || 1,
-        totalAmount: Number(o.totalAmount || 0),
-        paidAmount: Number(o.paidAmount || 0),
-        status: (o.status as any) || "Pending",
-        date: new Date(o.date).toLocaleDateString(),
-      }));
-    } else {
-      effectiveOrders = [];
-    }
-  }
+  // Map real database orders from Neon
+  const effectiveOrders: OrderItem[] = (tenantData?.orders || []).map((o) => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    partyName: o.partyName,
+    distributorName: o.distributorName || "Field Agent",
+    itemsCount: o.itemsCount || 1,
+    totalAmount: Number(o.totalAmount || 0),
+    paidAmount: Number(o.paidAmount || 0),
+    status: (o.status as any) || "Pending",
+    date: new Date(o.date).toLocaleDateString(),
+  }));
 
   const filteredOrders = effectiveOrders.filter((order) => {
     const matchesStatus =
@@ -170,19 +92,6 @@ export default function CompanyOrdersPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* No Access / Demo Banner */}
-      {!hasAccess && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 text-xs">
-          <ShoppingBag className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <div className="font-bold text-sm">Demo / Sandbox Mode (No Active Tenant)</div>
-            <p className="text-amber-700 mt-0.5">
-              Your account is not linked to an active company tenant. Displaying simulated purchase orders.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -190,12 +99,12 @@ export default function CompanyOrdersPage() {
             B2B Orders & Fulfillment
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Manage incoming purchase orders from mobile field distributors and dispatch workflows.
+            Manage incoming purchase orders from mobile field distributors and dispatch workflows for {activeTenant?.name || "your organization"}.
           </p>
         </div>
 
         <button
-          onClick={() => alert("Open New Order Modal")}
+          onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
@@ -218,122 +127,98 @@ export default function CompanyOrdersPage() {
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-start md:self-auto overflow-x-auto text-xs font-medium">
-          {["all", "pending", "in transit", "delivered", "cancelled"].map((st) => (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs font-medium">
+          {["all", "delivered", "in transit", "pending", "cancelled"].map((tab) => (
             <button
-              key={st}
-              onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1.5 rounded-lg capitalize transition ${
-                filterStatus === st
-                  ? "bg-white text-slate-900 font-semibold shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+              key={tab}
+              onClick={() => setFilterStatus(tab)}
+              className={`px-3 py-1.5 rounded-xl capitalize whitespace-nowrap transition-colors ${
+                filterStatus === tab
+                  ? "bg-slate-900 text-white font-semibold"
+                  : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              {st}
+              {tab}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Orders Table */}
+      {/* Orders Table Container */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4 font-semibold">Order ID</th>
-                <th className="py-3 px-4 font-semibold">Party Store</th>
-                <th className="py-3 px-4 font-semibold">Distributor</th>
-                <th className="py-3 px-4 font-semibold text-center">Items</th>
-                <th className="py-3 px-4 font-semibold text-right">Order Value</th>
-                <th className="py-3 px-4 font-semibold text-right">Khata Balance</th>
-                <th className="py-3 px-4 font-semibold text-center">Status</th>
-                <th className="py-3 px-4 font-semibold text-right">Actions</th>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
+                <th className="py-3.5 px-4">Order ID</th>
+                <th className="py-3.5 px-4">Customer Party</th>
+                <th className="py-3.5 px-4">Distributor Agent</th>
+                <th className="py-3.5 px-4">Date</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 text-right">Order Amount</th>
+                <th className="py-3.5 px-4 text-right">Paid Amount</th>
+                <th className="py-3.5 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 px-4 text-center">
-                    <div className="max-w-sm mx-auto flex flex-col items-center justify-center space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
-                        <ShoppingBag className="w-6 h-6" />
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-sm font-bold text-slate-800">
-                          {effectiveOrders.length === 0
-                            ? "No orders received yet"
-                            : "No matching orders found"}
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          {effectiveOrders.length === 0
-                            ? "As your registered field distributors take and sync purchase orders from stores, they will automatically appear here."
-                            : "Try adjusting your search terms or status filters."}
-                        </p>
-                      </div>
-                      {effectiveOrders.length === 0 && (
-                        <button
-                          onClick={() => alert("Open New Order Modal")}
-                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Record First Order
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredOrders.map((ord) => (
-                  <tr key={ord.id} className="hover:bg-slate-50/80 transition group">
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 font-mono">
-                        {ord.orderNumber}
-                      </div>
-                      <div className="text-[10px] text-slate-400">{ord.date}</div>
+              {filteredOrders.length > 0 ? (
+                filteredOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-slate-50/70 transition">
+                    <td className="py-3 px-4 font-mono font-bold text-blue-600">
+                      {order.orderNumber}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-800">{ord.partyName}</div>
+                    <td className="py-3 px-4 font-semibold text-slate-900">
+                      {order.partyName}
                     </td>
                     <td className="py-3 px-4 text-slate-600">
-                      {ord.distributorName}
+                      {order.distributorName}
                     </td>
-                    <td className="py-3 px-4 text-center font-medium text-slate-700">
-                      {ord.itemsCount} SKUs
+                    <td className="py-3 px-4 text-slate-500">
+                      {order.date}
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-slate-900">
-                      Rs. {ord.totalAmount.toLocaleString()}
+                    <td className="py-3 px-4">
+                      {getStatusBadge(order.status)}
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      {ord.totalAmount - ord.paidAmount > 0 ? (
-                        <span className="text-amber-700 font-semibold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                          Due: Rs. {(ord.totalAmount - ord.paidAmount).toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-emerald-700 font-semibold text-[11px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          Paid Full
-                        </span>
-                      )}
+                    <td className="py-3 px-4 text-right font-extrabold text-slate-900">
+                      Rs. {order.totalAmount.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 text-right font-semibold text-emerald-600">
+                      Rs. {order.paidAmount.toLocaleString()}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      {getStatusBadge(ord.status)}
-                    </td>
-                    <td className="py-3 px-4 text-right">
                       <button
-                        onClick={() => alert(`View details for ${ord.orderNumber}`)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
-                        title="View Invoice"
+                        onClick={() => alert(`Order details: ${order.orderNumber}`)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition"
+                        title="View Details"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <ShoppingBag className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                    <p className="font-semibold text-slate-600">No orders found in database</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Click &quot;Create B2B Order&quot; to record your first company dispatch.
+                    </p>
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+                    >
+                      Create First Order
+                    </button>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      <NewOrderModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

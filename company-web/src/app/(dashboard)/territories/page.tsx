@@ -80,18 +80,6 @@ export default function CompanyTerritoriesPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* No Access / Demo Banner */}
-      {!hasAccess && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 text-xs">
-          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <div className="font-bold text-sm">Demo / Sandbox Mode (No Active Tenant)</div>
-            <p className="text-amber-700 mt-0.5">
-              Your account is not linked to an active company tenant. Displaying simulated territory data.
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

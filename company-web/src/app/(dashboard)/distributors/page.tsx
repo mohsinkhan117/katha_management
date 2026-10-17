@@ -109,43 +109,20 @@ export default function CompanyDistributorsPage() {
     }
   };
 
-  // Rule logic:
-  // If tenant has access and is a custom DB tenant: show ONLY its real database tokens/distributors (0 if none generated yet).
-  // If user does not have access or is viewing the sandbox demo: show the sandbox demo dataset.
-  let distributorsList: DistributorItem[] = mockDistributorsDemo;
-
-  if (hasAccess && isCustomTenant) {
-    if (tenantData && tenantData.distributors) {
-      distributorsList = tenantData.distributors.map((d) => ({
-        id: d.id,
-        name: d.name,
-        phone: d.phone,
-        territory: d.territory,
-        inviteToken: d.inviteToken,
-        isClaimed: d.isClaimed,
-        totalOrders: 0,
-        monthlySales: 0,
-        lastActive: d.isClaimed ? "Active on terminal" : "Awaiting claim",
-      }));
-    } else {
-      distributorsList = [];
-    }
-  }
+  const distributorsList: DistributorItem[] = (tenantData?.distributors || []).map((d) => ({
+    id: d.id,
+    name: d.name,
+    phone: d.phone,
+    territory: d.territory,
+    inviteToken: d.inviteToken,
+    isClaimed: d.isClaimed,
+    totalOrders: 0,
+    monthlySales: 0,
+    lastActive: d.isClaimed ? "Active on terminal" : "Awaiting claim",
+  }));
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* No Access / Demo Banner */}
-      {!hasAccess && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 text-xs">
-          <KeyRound className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <div className="font-bold text-sm">Demo / Sandbox Mode (No Active Tenant)</div>
-            <p className="text-amber-700 mt-0.5">
-              Your account is not linked to an active company tenant. Displaying simulated distributor invite tokens.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

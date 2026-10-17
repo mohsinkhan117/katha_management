@@ -57,8 +57,15 @@ export function Header({
   isCollapsed,
 }: HeaderProps) {
   const pathname = usePathname();
-  const { activeTenant, availableTenants, switchTenant } = useTenant();
+  const { activeTenant, availableTenants, switchTenant, refreshTenantData } = useTenant();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshTenantData();
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
 
   const currentMeta = pageTitles[pathname] || {
     title: "Company Portal",
@@ -164,10 +171,11 @@ export function Header({
 
         {/* Sync Status Button */}
         <button
-          title="Manual Force Sync with PowerSync & Supabase"
+          onClick={handleRefresh}
+          title="Manual Refresh with Neon Database"
           className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition relative"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-blue-600" : ""}`} />
         </button>
 
         {/* Notification Bell */}

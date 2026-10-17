@@ -271,11 +271,14 @@ export function Sidebar({
         {/* User Profile & Collapse Toggle Footer */}
         <div className="p-3 border-t border-slate-800 flex items-center justify-between gap-2">
           <Link
-            href="/handler/account-settings"
+            href="/settings"
             className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition"
+            title="Company Profile Settings"
           >
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0 ring-2 ring-slate-800">
-              CA
+              {activeTenant?.name
+                ? activeTenant.name.split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()
+                : "CA"}
             </div>
             {(!isCollapsed || isMobileOpen) && (
               <div className="flex flex-col min-w-0">

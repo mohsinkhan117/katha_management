@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useUser } from "@stackframe/stack";
 
 export interface TenantInfo {
@@ -20,7 +20,15 @@ export interface TenantDataPayload {
     totalSales: number;
     totalPaid: number;
     totalProfit: number;
+    outstandingReceivables?: number;
+    recoveryRate?: number;
   };
+  orderStatuses?: Array<{
+    status: "Delivered" | "In Transit" | "Pending" | "Cancelled";
+    count: number;
+    percentage: number;
+    color: string;
+  }>;
   distributors: Array<{
     id: string;
     inviteToken: string;
@@ -41,6 +49,25 @@ export interface TenantDataPayload {
     status: string;
     date: string;
   }>;
+  products?: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    category: string;
+    unitPrice: number;
+    stockQuantity: number;
+    isActive: boolean;
+    createdAt?: string;
+  }>;
+  parties?: Array<{
+    id: string;
+    name: string;
+    ownerName?: string;
+    phone?: string;
+    territory?: string;
+    balance?: number;
+    createdAt?: string;
+  }>;
 }
 
 interface TenantContextType {
@@ -52,6 +79,11 @@ interface TenantContextType {
   isLoading: boolean;
   switchTenant: (slugOrId: string) => void;
   refreshTenantData: () => Promise<void>;
+  updateTenantProfile: (data: { name?: string; phone?: string; address?: string; adminEmail?: string }) => Promise<{ success: boolean; error?: string }>;
+  createOrder: (order: { partyName: string; distributorName?: string; totalAmount: number; paidAmount?: number; status?: string; itemsCount?: number }) => Promise<{ success: boolean; error?: string }>;
+  recordCollection: (collection: { orderId?: string; partyName?: string; amount: number }) => Promise<{ success: boolean; error?: string }>;
+  createProduct: (product: { name: string; sku?: string; category?: string; unitPrice: number; stockQuantity?: number }) => Promise<{ success: boolean; error?: string }>;
+  issueToken: (tokenData: { territoryName?: string; distributorName?: string; phone?: string }) => Promise<{ success: boolean; token?: any; error?: string }>;
 }
 
 const TenantContext = createContext<TenantContextType>({
@@ -63,6 +95,11 @@ const TenantContext = createContext<TenantContextType>({
   isLoading: true,
   switchTenant: () => {},
   refreshTenantData: async () => {},
+  updateTenantProfile: async () => ({ success: false }),
+  createOrder: async () => ({ success: false }),
+  recordCollection: async () => ({ success: false }),
+  createProduct: async () => ({ success: false }),
+  issueToken: async () => ({ success: false }),
 });
 
 const DEFAULT_FALLBACK_TENANT: TenantInfo = {
@@ -81,114 +118,106 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [availableTenants, setAvailableTenants] = useState<TenantInfo[]>([]);
   const [tenantData, setTenantData] = useState<TenantDataPayload | null>(null);
   const [hasAccess, setHasAccess] = useState<boolean>(true);
-  const [isCustomTenant, setIsCustomTenant] = useState<boolean>(false);
+  const [isCustomTenant, setIsCustomTenant] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Fetch available tenants list and bind strictly to logged-in user
-  useEffect(() => {
-    async function loadTenants() {
-      try {
-        setIsLoading(true);
-        const res = await fetch("/api/tenant");
-        const json = await res.json();
-
-        let companies: TenantInfo[] = [];
-        if (json.success && json.companies && json.companies.length > 0) {
-          companies = json.companies;
-        } else {
-          companies = [DEFAULT_FALLBACK_TENANT];
-        }
-
-        const userEmail = user?.primaryEmail?.toLowerCase();
-        const isSuperAdmin = Boolean(
-          userEmail &&
-            (userEmail.includes("superadmin") ||
-              userEmail.endsWith("@katha.com") ||
-              userEmail === "admin@katha.com")
-        );
-
-        if (isSuperAdmin) {
-          // Super admin can access and switch between all active companies
-          setAvailableTenants(companies);
-          const savedSlug =
-            typeof window !== "undefined"
-              ? localStorage.getItem("katha_selected_tenant_slug")
-              : null;
-          const matched = savedSlug
-            ? companies.find((c) => c.slug === savedSlug || c.id === savedSlug)
-            : undefined;
-          const chosen = matched || companies[0] || DEFAULT_FALLBACK_TENANT;
-          setActiveTenant(chosen);
-          setHasAccess(true);
-          setIsCustomTenant(chosen.slug !== "apex-agro");
-        } else if (userEmail) {
-          // Tenant user: Find matching tenant by admin_email
-          const matched = companies.find(
-            (c) => c.admin_email?.toLowerCase() === userEmail
-          );
-
-          if (matched) {
-            // Strictly isolate to this tenant only. User cannot see or switch to other tenants.
-            setAvailableTenants([matched]);
-            setActiveTenant(matched);
-            setHasAccess(true);
-            setIsCustomTenant(matched.slug !== "apex-agro");
-          } else {
-            // User does not belong to any active company
-            // As required: only if it does not have any access should it see dummy data
-            setAvailableTenants([DEFAULT_FALLBACK_TENANT]);
-            setActiveTenant(DEFAULT_FALLBACK_TENANT);
-            setHasAccess(false);
-            setIsCustomTenant(false);
-          }
-        } else {
-          // Not logged in: Show sandbox demo with no access
-          setAvailableTenants([DEFAULT_FALLBACK_TENANT]);
-          setActiveTenant(DEFAULT_FALLBACK_TENANT);
-          setHasAccess(false);
-          setIsCustomTenant(false);
-        }
-      } catch (err) {
-        console.error("Failed to load tenants:", err);
-        setAvailableTenants([DEFAULT_FALLBACK_TENANT]);
-        setActiveTenant(DEFAULT_FALLBACK_TENANT);
-        setHasAccess(false);
-        setIsCustomTenant(false);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadTenants();
-  }, [user]);
-
-  // 2. Fetch active tenant's real database records
-  const fetchActiveTenantData = async () => {
-    if (!activeTenant) return;
-
+  // Fetch tenant data for active tenant
+  const fetchTenantDataFor = useCallback(async (tenant: TenantInfo) => {
     try {
-      const res = await fetch(`/api/tenant/data?companyId=${encodeURIComponent(activeTenant.id)}&slug=${encodeURIComponent(activeTenant.slug)}`);
+      const res = await fetch(`/api/tenant/data?companyId=${encodeURIComponent(tenant.id)}&slug=${encodeURIComponent(tenant.slug)}`);
       const json = await res.json();
 
       if (json.success) {
-        setHasAccess(json.hasAccess ?? true);
-        setIsCustomTenant(json.isCustomTenant ?? (activeTenant.slug !== "apex-agro"));
         setTenantData({
           metrics: json.metrics || { totalOrders: 0, totalSales: 0, totalPaid: 0, totalProfit: 0 },
+          orderStatuses: json.orderStatuses || [],
           distributors: json.distributors || [],
           orders: json.orders || [],
+          products: json.products || [],
+          parties: json.parties || [],
         });
       }
     } catch (err) {
       console.error("Failed to fetch tenant data:", err);
     }
-  };
+  }, []);
 
-  useEffect(() => {
+  const refreshTenantData = useCallback(async () => {
     if (activeTenant) {
-      fetchActiveTenantData();
+      await fetchTenantDataFor(activeTenant);
     }
-  }, [activeTenant]);
+  }, [activeTenant, fetchTenantDataFor]);
+
+  // Load / Sync Tenant when User state changes
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function syncUserTenant() {
+      try {
+        setIsLoading(true);
+        const userEmail = user?.primaryEmail?.toLowerCase();
+        const displayName = user?.displayName || (userEmail ? userEmail.split("@")[0] : null);
+
+        if (userEmail) {
+          // Logged-in user: sync or auto-provision company in Neon PostgreSQL
+          const syncRes = await fetch("/api/tenant", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: userEmail,
+              name: displayName ? `${displayName.charAt(0).toUpperCase() + displayName.slice(1)} Commercial` : undefined,
+            }),
+          });
+          const syncJson = await syncRes.json();
+
+          if (!isCancelled && syncJson.success && syncJson.company) {
+            const company: TenantInfo = syncJson.company;
+            setActiveTenant(company);
+            setAvailableTenants([company]);
+            setHasAccess(true);
+            setIsCustomTenant(true);
+            await fetchTenantDataFor(company);
+            return;
+          }
+        }
+
+        // Fallback for demo or non-logged in state
+        if (!isCancelled) {
+          const res = await fetch("/api/tenant");
+          const json = await res.json();
+          let companies: TenantInfo[] = [];
+          if (json.success && json.companies && json.companies.length > 0) {
+            companies = json.companies;
+          } else {
+            companies = [DEFAULT_FALLBACK_TENANT];
+          }
+
+          const defaultTenant = companies[0] || DEFAULT_FALLBACK_TENANT;
+          setActiveTenant(defaultTenant);
+          setAvailableTenants(companies);
+          setHasAccess(Boolean(userEmail));
+          setIsCustomTenant(true);
+          await fetchTenantDataFor(defaultTenant);
+        }
+      } catch (err) {
+        console.error("Failed to initialize tenant context:", err);
+        if (!isCancelled) {
+          setActiveTenant(DEFAULT_FALLBACK_TENANT);
+          setAvailableTenants([DEFAULT_FALLBACK_TENANT]);
+          setHasAccess(Boolean(user?.primaryEmail));
+          setIsCustomTenant(true);
+        }
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
+    }
+
+    syncUserTenant();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, fetchTenantDataFor]);
 
   const switchTenant = (slugOrId: string) => {
     const found = availableTenants.find(
@@ -199,20 +228,153 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         localStorage.setItem("katha_selected_tenant_slug", found.slug);
       }
+      fetchTenantDataFor(found);
+    }
+  };
+
+  // Update company profile in Neon DB and state
+  const updateTenantProfile = async (data: { name?: string; phone?: string; address?: string; adminEmail?: string }) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    try {
+      const res = await fetch("/api/tenant", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: activeTenant.id,
+          ...data,
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.company) {
+        const updated = json.company;
+        setActiveTenant(updated);
+        setAvailableTenants((prev) =>
+          prev.map((c) => (c.id === updated.id ? updated : c))
+        );
+        return { success: true };
+      }
+      return { success: false, error: json.error || "Failed to update profile" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Create B2B Order in Neon DB
+  const createOrder = async (order: { partyName: string; distributorName?: string; totalAmount: number; paidAmount?: number; status?: string; itemsCount?: number }) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    try {
+      const res = await fetch("/api/tenant/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_order",
+          companyId: activeTenant.id,
+          ...order,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await refreshTenantData();
+        return { success: true };
+      }
+      return { success: false, error: json.error || "Failed to create order" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Record Collection in Neon DB
+  const recordCollection = async (collection: { orderId?: string; partyName?: string; amount: number }) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    try {
+      const res = await fetch("/api/tenant/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "record_collection",
+          companyId: activeTenant.id,
+          ...collection,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await refreshTenantData();
+        return { success: true };
+      }
+      return { success: false, error: json.error || "Failed to record collection" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Create Product SKU in Neon DB
+  const createProduct = async (product: { name: string; sku?: string; category?: string; unitPrice: number; stockQuantity?: number }) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    try {
+      const res = await fetch("/api/tenant/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_product",
+          companyId: activeTenant.id,
+          ...product,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await refreshTenantData();
+        return { success: true };
+      }
+      return { success: false, error: json.error || "Failed to add product" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Issue Distributor Token in Neon DB
+  const issueToken = async (tokenData: { territoryName?: string; distributorName?: string; phone?: string }) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    try {
+      const res = await fetch("/api/tenant/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: activeTenant.id,
+          ...tokenData,
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.token) {
+        await refreshTenantData();
+        return { success: true, token: json.token };
+      }
+      return { success: false, error: json.error || "Failed to generate token" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   };
 
   return (
     <TenantContext.Provider
       value={{
-        activeTenant: activeTenant || DEFAULT_FALLBACK_TENANT,
+        activeTenant,
         availableTenants,
         tenantData,
         hasAccess,
         isCustomTenant,
         isLoading,
         switchTenant,
-        refreshTenantData: fetchActiveTenantData,
+        refreshTenantData,
+        updateTenantProfile,
+        createOrder,
+        recordCollection,
+        createProduct,
+        issueToken,
       }}
     >
       {children}
@@ -221,5 +383,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useTenant() {
-  return useContext(TenantContext);
+  const context = useContext(TenantContext);
+  if (!context) {
+    throw new Error("useTenant must be used within a TenantProvider");
+  }
+  return context;
 }
