@@ -56,13 +56,32 @@ export async function ensureLedgerSchema() {
       admin_email VARCHAR(255) NOT NULL,
       phone VARCHAR(64),
       address TEXT,
-      plan_tier VARCHAR(32) DEFAULT 'standard',
+      plan_tier VARCHAR(32) DEFAULT 'free_trial',
       max_distributors INT DEFAULT 25,
       is_active BOOLEAN DEFAULT true,
+      trial_started_at TIMESTAMP WITH TIME ZONE,
+      expires_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `;
+
+  try {
+    await sql`
+      ALTER TABLE companies
+        ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
+    `;
+    await sql`
+      UPDATE companies
+      SET is_active = false, updated_at = NOW()
+      WHERE is_active = true
+        AND expires_at IS NOT NULL
+        AND expires_at < NOW();
+    `;
+  } catch (err) {
+    // Ignore if columns already exist
+  }
 
   await sql`
     CREATE TABLE IF NOT EXISTS ledger_categories (
@@ -207,13 +226,13 @@ export async function assertAdminAuth(req?: NextRequest) {
 
   let tenant: any = null;
 
-  // 1. If we have an authenticated userEmail, check if they own a company in Neon DB
+  // 1. If we have an authenticated userEmail, check if Super Admin provisioned a tenant or company previously signed up
   if (userEmail) {
     const byEmail = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active
+      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
       FROM companies
       WHERE LOWER(admin_email) = ${userEmail}
-      ORDER BY is_active DESC NULLS LAST, created_at DESC
+      ORDER BY created_at DESC
       LIMIT 1;
     `;
     if (byEmail && byEmail.length > 0) {
@@ -221,23 +240,22 @@ export async function assertAdminAuth(req?: NextRequest) {
     }
   }
 
-  // 2. If client passed an explicit active tenant ID (and either no userEmail company yet or superadmin/matching tenant)
+  // 2. If client passed an explicit active tenant ID
   if (!tenant && headerTenantId) {
     const byId = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active
+      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
       FROM companies
       WHERE id = ${headerTenantId} OR slug = ${headerTenantId}
       LIMIT 1;
     `;
     if (byId && byId.length > 0) {
-      // Only use if userEmail isn't a brand-new user needing their own company, or if headerTenantId matches
       if (!userEmail || byId[0].admin_email?.toLowerCase() === userEmail || headerTenantId !== "comp_apex_agro_01") {
         tenant = byId[0];
       }
     }
   }
 
-  // 3. If userEmail is present and still no company exists for them, auto-provision their tenant company
+  // 3. First-time Company Sign-Up -> Activate 1-Month Free Tier (`free_trial` for 30 days)
   if (!tenant && userEmail) {
     const cleanPrefix = userEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "") || "tenant";
     const companyId = `comp_${cleanPrefix}_${Date.now().toString(36)}`;
@@ -246,22 +264,32 @@ export async function assertAdminAuth(req?: NextRequest) {
       headerUserName ||
       `${cleanPrefix.charAt(0).toUpperCase() + cleanPrefix.slice(1)} Commercial`;
     const companySlug = `${cleanPrefix.toLowerCase()}-${Date.now().toString(36).slice(-4)}`;
+    const now = new Date();
+    const oneMonthLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const inserted = await sql`
       INSERT INTO companies (
-        id, name, slug, admin_email, plan_tier, is_active
+        id, name, slug, admin_email, plan_tier, max_distributors, is_active, trial_started_at, expires_at
       ) VALUES (
-        ${companyId}, ${companyName}, ${companySlug}, ${userEmail}, 'standard', true
+        ${companyId},
+        ${companyName},
+        ${companySlug},
+        ${userEmail},
+        'free_trial',
+        5,
+        true,
+        ${now.toISOString()},
+        ${oneMonthLater.toISOString()}
       )
-      RETURNING id, name, slug, admin_email, plan_tier, is_active;
+      RETURNING id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at;
     `;
     tenant = inserted[0];
   }
 
-  // 4. Fallback to headerTenantId or first active company in DB (so portal works seamlessly even before Stack cookie sync)
+  // 4. Fallback to headerTenantId or first active company in DB
   if (!tenant && headerTenantId) {
     const byId = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active
+      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
       FROM companies
       WHERE id = ${headerTenantId} OR slug = ${headerTenantId}
       LIMIT 1;
@@ -273,7 +301,7 @@ export async function assertAdminAuth(req?: NextRequest) {
 
   if (!tenant) {
     const allCompanies = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active
+      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
       FROM companies
       WHERE is_active = true
       ORDER BY created_at ASC
@@ -298,9 +326,22 @@ export async function assertAdminAuth(req?: NextRequest) {
         true
       )
       ON CONFLICT (id) DO UPDATE SET is_active = true
-      RETURNING id, name, slug, admin_email, plan_tier, is_active;
+      RETURNING id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at;
     `;
     tenant = insertedDefault[0];
+  }
+
+  // Check if the tenant's 1-month free tier or subscription has expired / been deactivated
+  const isExpired =
+    tenant.expires_at && new Date(tenant.expires_at).getTime() < Date.now();
+  if (isExpired || tenant.is_active === false) {
+    const err: any = new Error(
+      isExpired
+        ? "Forbidden: Your 1-month Free Tier has expired and your company account is deactivated. Please contact Super Admin to renew."
+        : "Forbidden: Your company tenant account is currently deactivated."
+    );
+    err.statusCode = 403;
+    throw err;
   }
 
   await seedDefaultCategories(tenant.id);

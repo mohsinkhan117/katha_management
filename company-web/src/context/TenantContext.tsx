@@ -12,6 +12,11 @@ export interface TenantInfo {
   address?: string;
   plan_tier: string;
   max_distributors?: number;
+  is_active?: boolean;
+  is_expired?: boolean;
+  days_remaining?: number | null;
+  trial_started_at?: string | null;
+  expires_at?: string | null;
 }
 
 export interface ProductSize {
@@ -97,6 +102,8 @@ interface TenantContextType {
   availableTenants: TenantInfo[];
   tenantData: TenantDataPayload | null;
   hasAccess: boolean;
+  isDeactivated: boolean;
+  deactivationReason: string | null;
   isCustomTenant: boolean;
   isLoading: boolean;
   switchTenant: (slugOrId: string) => void;
@@ -135,6 +142,8 @@ const TenantContext = createContext<TenantContextType>({
   availableTenants: [],
   tenantData: null,
   hasAccess: true,
+  isDeactivated: false,
+  deactivationReason: null,
   isCustomTenant: false,
   isLoading: true,
   switchTenant: () => {},
@@ -155,6 +164,7 @@ const DEFAULT_FALLBACK_TENANT: TenantInfo = {
   phone: "+92 42 35789000",
   address: "Plot 42, Industrial Estate, Kot Lakhpat, Lahore",
   plan_tier: "enterprise",
+  is_active: true,
 };
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
@@ -163,6 +173,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [availableTenants, setAvailableTenants] = useState<TenantInfo[]>([]);
   const [tenantData, setTenantData] = useState<TenantDataPayload | null>(null);
   const [hasAccess, setHasAccess] = useState<boolean>(true);
+  const [isDeactivated, setIsDeactivated] = useState<boolean>(false);
+  const [deactivationReason, setDeactivationReason] = useState<string | null>(null);
   const [isCustomTenant, setIsCustomTenant] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -204,7 +216,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         const displayName = user?.displayName || (userEmail ? userEmail.split("@")[0] : null);
 
         if (userEmail) {
-          // Logged-in user: sync or auto-provision company in Neon PostgreSQL
+          // Logged-in user:
+          // - If Super Admin provisioned a tenant for this email -> Sign-In binds to that tenant
+          // - If new Sign-Up -> Activates 1-Month Free Tier (expires after 30 days)
           const syncRes = await fetch("/api/tenant", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -217,16 +231,21 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
           if (!isCancelled && syncJson.success && syncJson.company) {
             const company: TenantInfo = syncJson.company;
+            const deactivated = Boolean(syncJson.isDeactivated || company.is_active === false || company.is_expired);
             setActiveTenant(company);
             setAvailableTenants([company]);
-            setHasAccess(true);
+            setIsDeactivated(deactivated);
+            setDeactivationReason(syncJson.deactivationReason || null);
+            setHasAccess(!deactivated);
             setIsCustomTenant(true);
-            await fetchTenantDataFor(company);
+            if (!deactivated) {
+              await fetchTenantDataFor(company);
+            }
             return;
           }
         }
 
-        // Fallback for demo or non-logged in state
+        // Fallback for non-logged in state
         if (!isCancelled) {
           const res = await fetch("/api/tenant");
           const json = await res.json();
@@ -240,6 +259,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
           const defaultTenant = companies[0] || DEFAULT_FALLBACK_TENANT;
           setActiveTenant(defaultTenant);
           setAvailableTenants(companies);
+          setIsDeactivated(false);
+          setDeactivationReason(null);
           setHasAccess(Boolean(userEmail));
           setIsCustomTenant(true);
           await fetchTenantDataFor(defaultTenant);
@@ -457,6 +478,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         availableTenants,
         tenantData,
         hasAccess,
+        isDeactivated,
+        deactivationReason,
         isCustomTenant,
         isLoading,
         switchTenant,
