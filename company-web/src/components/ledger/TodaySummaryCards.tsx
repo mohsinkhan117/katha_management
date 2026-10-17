@@ -89,8 +89,10 @@ export function TodaySummaryCards({
   };
 
   const todayIso = getTodayIso();
+  const userEmail = user?.primaryEmail || activeTenant?.admin_email || "";
 
   useEffect(() => {
+    if (!userEmail) return;
     let isMounted = true;
     async function fetchSummary() {
       setIsLoading(true);
@@ -100,13 +102,11 @@ export function TodaySummaryCards({
           month: String(selectedMonth),
           year: String(selectedYear),
         });
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = {
+          "x-user-email": userEmail,
+        };
         if (activeTenant?.id) {
           headers["x-tenant-id"] = activeTenant.id;
-        }
-        const email = user?.primaryEmail || activeTenant?.admin_email;
-        if (email) {
-          headers["x-user-email"] = email;
         }
         const res = await fetch(`/api/ledger/summary?${params.toString()}`, {
           headers,
@@ -128,7 +128,7 @@ export function TodaySummaryCards({
     return () => {
       isMounted = false;
     };
-  }, [selectedDate, selectedMonth, selectedYear, refreshTrigger, activeTenant?.id, user?.primaryEmail]);
+  }, [selectedDate, selectedMonth, selectedYear, refreshTrigger, userEmail]);
 
   const formatCurrency = (minor: number) => {
     return new Intl.NumberFormat("en-PK", {

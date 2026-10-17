@@ -1,4 +1,10 @@
-import { sql } from "@/lib/neon/db";
+import {
+  sql,
+  ensureAppSchema,
+  getCachedTenantByEmail,
+  setCachedTenantByEmail,
+  getSeededTenantsSet,
+} from "@/lib/neon/db";
 import { stackServerApp } from "@/stack";
 import { NextRequest } from "next/server";
 import { CreateLedgerEntryInput, LedgerFilterInput } from "./schemas";
@@ -46,149 +52,50 @@ export interface AggregatedItemSummary {
   purchaseCount: number;
 }
 
-// 1. Ensure Tables, Columns & Indexes Exist in Neon PostgreSQL
+// 1. Ensure Tables, Columns & Indexes Exist in Neon PostgreSQL (Singleton)
 export async function ensureLedgerSchema() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS companies (
-      id VARCHAR(64) PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      slug VARCHAR(128) UNIQUE NOT NULL,
-      admin_email VARCHAR(255) NOT NULL,
-      phone VARCHAR(64),
-      address TEXT,
-      plan_tier VARCHAR(32) DEFAULT 'free_trial',
-      max_distributors INT DEFAULT 25,
-      is_active BOOLEAN DEFAULT true,
-      trial_started_at TIMESTAMP WITH TIME ZONE,
-      expires_at TIMESTAMP WITH TIME ZONE,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-
-  try {
-    await sql`
-      ALTER TABLE companies
-        ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP WITH TIME ZONE,
-        ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
-    `;
-    await sql`
-      UPDATE companies
-      SET is_active = false, updated_at = NOW()
-      WHERE is_active = true
-        AND expires_at IS NOT NULL
-        AND expires_at < NOW();
-    `;
-  } catch (err) {
-    // Ignore if columns already exist
-  }
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS ledger_categories (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      tenant_id VARCHAR(64) NOT NULL,
-      name VARCHAR(128) NOT NULL,
-      type VARCHAR(16) NOT NULL CHECK (type IN ('income', 'expense')),
-      is_default BOOLEAN NOT NULL DEFAULT false,
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      CONSTRAINT uq_tenant_category_name UNIQUE (tenant_id, name)
-    );
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS ledger_entries (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      tenant_id VARCHAR(64) NOT NULL,
-      type VARCHAR(16) NOT NULL DEFAULT 'expense' CHECK (type IN ('income', 'expense')),
-      title VARCHAR(255) NOT NULL,
-      category_id UUID NOT NULL REFERENCES ledger_categories(id),
-      quantity NUMERIC(12, 2) NOT NULL DEFAULT 1,
-      unit VARCHAR(32) NOT NULL DEFAULT 'pcs',
-      unit_cost_minor BIGINT,
-      amount_minor BIGINT NOT NULL CHECK (amount_minor > 0),
-      vendor_name VARCHAR(255),
-      currency CHAR(3) NOT NULL DEFAULT 'PKR',
-      payment_method VARCHAR(16) CHECK (payment_method IN ('cash', 'card', 'online', 'other')),
-      occurred_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      added_by VARCHAR(128) NOT NULL,
-      added_by_name VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      is_voided BOOLEAN NOT NULL DEFAULT false,
-      voided_at TIMESTAMP WITH TIME ZONE,
-      voided_by VARCHAR(128),
-      void_reason TEXT
-    );
-  `;
-
-  try {
-    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS quantity NUMERIC(12, 2) NOT NULL DEFAULT 1;`;
-    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS unit VARCHAR(32) NOT NULL DEFAULT 'pcs';`;
-    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS unit_cost_minor BIGINT;`;
-    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS vendor_name VARCHAR(255);`;
-  } catch (err) {
-    // Columns already exist
-  }
-
-  try {
-    await sql`CREATE INDEX IF NOT EXISTS idx_ledger_categories_tenant ON ledger_categories (tenant_id, type);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant_occurred ON ledger_entries (tenant_id, occurred_at DESC);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant_category ON ledger_entries (tenant_id, category_id);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant_type_occurred ON ledger_entries (tenant_id, type, occurred_at);`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant_void ON ledger_entries (tenant_id, is_voided);`;
-  } catch (err: any) {
-    // Indexes already exist
-  }
+  await ensureAppSchema();
 }
 
-// 2. Seed Default Categories per Tenant (Hotel / Party Purchase & Expense Categories)
+// 2. Seed Default Categories per Tenant (Single Batch Query + In-Memory Memoization)
 export async function seedDefaultCategories(tenantId: string) {
-  const defaultCategories: Array<{ name: string; type: "income" | "expense" }> = [
-    // Hotel / Party Purchase & Expense Categories
-    { name: "Meat & Poultry", type: "expense" },
-    { name: "Vegetables & Fruits", type: "expense" },
-    { name: "Groceries & Spices", type: "expense" },
-    { name: "Dairy & Bakery", type: "expense" },
-    { name: "Beverages & Drinks", type: "expense" },
-    { name: "Kitchen Supplies & Gas", type: "expense" },
-    { name: "Stock Purchase", type: "expense" },
-    { name: "Utilities", type: "expense" },
-    { name: "Wages", type: "expense" },
-    { name: "Rent", type: "expense" },
-    { name: "Transport", type: "expense" },
-    { name: "Maintenance", type: "expense" },
-    { name: "Other", type: "expense" },
-    // Income Categories (if needed)
-    { name: "Sales - Cash", type: "income" },
-    { name: "Sales - Card", type: "income" },
-    { name: "Sales - Online", type: "income" },
-    { name: "Other Income", type: "income" },
-  ];
+  const seededSet = getSeededTenantsSet();
+  if (seededSet.has(tenantId)) {
+    return;
+  }
 
-  for (const cat of defaultCategories) {
-    try {
-      await sql`
-        INSERT INTO ledger_categories (
-          tenant_id,
-          name,
-          type,
-          is_default
-        ) VALUES (
-          ${tenantId},
-          ${cat.name},
-          ${cat.type},
-          true
-        )
-        ON CONFLICT (tenant_id, name) DO NOTHING;
-      `;
-    } catch (e) {
-      // Ignore conflict
-    }
+  try {
+    await sql`
+      INSERT INTO ledger_categories (tenant_id, name, type, is_default)
+      VALUES
+        (${tenantId}, 'Meat & Poultry', 'expense', true),
+        (${tenantId}, 'Vegetables & Fruits', 'expense', true),
+        (${tenantId}, 'Groceries & Spices', 'expense', true),
+        (${tenantId}, 'Dairy & Bakery', 'expense', true),
+        (${tenantId}, 'Beverages & Drinks', 'expense', true),
+        (${tenantId}, 'Kitchen Supplies & Gas', 'expense', true),
+        (${tenantId}, 'Stock Purchase', 'expense', true),
+        (${tenantId}, 'Utilities', 'expense', true),
+        (${tenantId}, 'Wages', 'expense', true),
+        (${tenantId}, 'Rent', 'expense', true),
+        (${tenantId}, 'Transport', 'expense', true),
+        (${tenantId}, 'Maintenance', 'expense', true),
+        (${tenantId}, 'Other', 'expense', true),
+        (${tenantId}, 'Sales - Cash', 'income', true),
+        (${tenantId}, 'Sales - Card', 'income', true),
+        (${tenantId}, 'Sales - Online', 'income', true),
+        (${tenantId}, 'Other Income', 'income', true)
+      ON CONFLICT (tenant_id, name) DO NOTHING;
+    `;
+    seededSet.add(tenantId);
+  } catch (e) {
+    // Ignore conflict
   }
 }
 
 // 3. Multi-Tenant Server Authentication & Admin Access Guard
 export async function assertAdminAuth(req?: NextRequest) {
-  await ensureLedgerSchema();
+  await ensureAppSchema();
 
   let user: any = null;
   if (req) {
@@ -222,53 +129,59 @@ export async function assertAdminAuth(req?: NextRequest) {
 
   if (!user || !userEmail) {
     const err: any = new Error("Unauthorized: Please sign in to your company account.");
+    err.status = 401;
     err.statusCode = 401;
     throw err;
   }
 
-  let tenant: any = null;
+  // Fast in-memory tenant cache lookup for parallel requests
+  let tenant: any = getCachedTenantByEmail(userEmail);
 
-  // 1. Check if Super Admin provisioned a tenant or company previously signed up for this user's email
-  const byEmail = await sql`
-    SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
-    FROM companies
-    WHERE LOWER(admin_email) = ${userEmail}
-    ORDER BY created_at DESC
-    LIMIT 1;
-  `;
-  if (byEmail && byEmail.length > 0) {
-    tenant = byEmail[0];
-  }
-
-  // 2. First-time Company Sign-Up -> Activate 1-Month Free Tier (`free_trial` for 30 days)
   if (!tenant) {
-    const cleanPrefix = userEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "") || "tenant";
-    const companyId = `comp_${cleanPrefix}_${Date.now().toString(36)}`;
-    const companyName =
-      user?.displayName ||
-      headerUserName ||
-      `${cleanPrefix.charAt(0).toUpperCase() + cleanPrefix.slice(1)} Commercial`;
-    const companySlug = `${cleanPrefix.toLowerCase()}-${Date.now().toString(36).slice(-4)}`;
-    const now = new Date();
-    const oneMonthLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-    const inserted = await sql`
-      INSERT INTO companies (
-        id, name, slug, admin_email, plan_tier, max_distributors, is_active, trial_started_at, expires_at
-      ) VALUES (
-        ${companyId},
-        ${companyName},
-        ${companySlug},
-        ${userEmail},
-        'free_trial',
-        5,
-        true,
-        ${now.toISOString()},
-        ${oneMonthLater.toISOString()}
-      )
-      RETURNING id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at;
+    // 1. Check if Super Admin provisioned a tenant or company previously signed up for this user's email
+    const byEmail = await sql`
+      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
+      FROM companies
+      WHERE LOWER(admin_email) = ${userEmail}
+      ORDER BY created_at DESC
+      LIMIT 1;
     `;
-    tenant = inserted[0];
+    if (byEmail && byEmail.length > 0) {
+      tenant = byEmail[0];
+    }
+
+    // 2. First-time Company Sign-Up -> Activate 1-Month Free Tier (`free_trial` for 30 days)
+    if (!tenant) {
+      const cleanPrefix = userEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "") || "tenant";
+      const companyId = `comp_${cleanPrefix}_${Date.now().toString(36)}`;
+      const companyName =
+        user?.displayName ||
+        headerUserName ||
+        `${cleanPrefix.charAt(0).toUpperCase() + cleanPrefix.slice(1)} Commercial`;
+      const companySlug = `${cleanPrefix.toLowerCase()}-${Date.now().toString(36).slice(-4)}`;
+      const now = new Date();
+      const oneMonthLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      const inserted = await sql`
+        INSERT INTO companies (
+          id, name, slug, admin_email, plan_tier, max_distributors, is_active, trial_started_at, expires_at
+        ) VALUES (
+          ${companyId},
+          ${companyName},
+          ${companySlug},
+          ${userEmail},
+          'free_trial',
+          5,
+          true,
+          ${now.toISOString()},
+          ${oneMonthLater.toISOString()}
+        )
+        RETURNING id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at;
+      `;
+      tenant = inserted[0];
+    }
+
+    setCachedTenantByEmail(userEmail, tenant);
   }
 
   // Check if the tenant's 1-month free tier or subscription has expired / been deactivated
@@ -280,6 +193,7 @@ export async function assertAdminAuth(req?: NextRequest) {
         ? "Forbidden: Your 1-month Free Tier has expired and your company account is deactivated. Please contact Super Admin to renew."
         : "Forbidden: Your company tenant account is currently deactivated."
     );
+    err.status = 403;
     err.statusCode = 403;
     throw err;
   }
@@ -309,7 +223,7 @@ export async function assertAdminAuth(req?: NextRequest) {
 
 // 4. Fetch Ledger Categories for Tenant
 export async function getLedgerCategories(tenantId: string) {
-  await ensureLedgerSchema();
+  await ensureAppSchema();
   await seedDefaultCategories(tenantId);
 
   const rows = await sql`
@@ -323,7 +237,7 @@ export async function getLedgerCategories(tenantId: string) {
 
 // 5. Create Custom Ledger Category
 export async function createLedgerCategory(tenantId: string, name: string, type: "income" | "expense" = "expense") {
-  await ensureLedgerSchema();
+  await ensureAppSchema();
 
   const rows = await sql`
     INSERT INTO ledger_categories (
@@ -350,7 +264,7 @@ export async function createLedgerEntry(
   userName: string,
   input: CreateLedgerEntryInput
 ) {
-  await ensureLedgerSchema();
+  await ensureAppSchema();
   await seedDefaultCategories(tenantId);
 
   let category: any = null;
@@ -593,36 +507,65 @@ export async function getLedgerEntries(
     orderByClause = sql`e.amount_minor ASC`;
   }
 
-  // 1. Fetch paginated entries
-  const rawEntries = await sql`
-    SELECT 
-      e.id,
-      e.tenant_id,
-      e.type,
-      e.title,
-      e.category_id,
-      c.name as category_name,
-      COALESCE(e.quantity, 1) as quantity,
-      COALESCE(e.unit, 'pcs') as unit,
-      COALESCE(e.unit_cost_minor, e.amount_minor) as unit_cost_minor,
-      e.amount_minor,
-      e.vendor_name,
-      e.currency,
-      e.payment_method,
-      e.occurred_at,
-      e.added_by,
-      e.added_by_name,
-      e.created_at,
-      e.is_voided,
-      e.voided_at,
-      e.voided_by,
-      e.void_reason
-    FROM ledger_entries e
-    JOIN ledger_categories c ON e.category_id = c.id
-    WHERE ${whereClause}
-    ORDER BY ${orderByClause}
-    LIMIT ${limit} OFFSET ${offset};
-  `;
+  // Execute paginated rows, combined count+totals, and aggregated item breakdown in PARALLEL
+  const [rawEntries, totalsResult, itemsBreakdownRows] = await Promise.all([
+    sql`
+      SELECT 
+        e.id,
+        e.tenant_id,
+        e.type,
+        e.title,
+        e.category_id,
+        c.name as category_name,
+        COALESCE(e.quantity, 1) as quantity,
+        COALESCE(e.unit, 'pcs') as unit,
+        COALESCE(e.unit_cost_minor, e.amount_minor) as unit_cost_minor,
+        e.amount_minor,
+        e.vendor_name,
+        e.currency,
+        e.payment_method,
+        e.occurred_at,
+        e.added_by,
+        e.added_by_name,
+        e.created_at,
+        e.is_voided,
+        e.voided_at,
+        e.voided_by,
+        e.void_reason
+      FROM ledger_entries e
+      JOIN ledger_categories c ON e.category_id = c.id
+      WHERE ${whereClause}
+      ORDER BY ${orderByClause}
+      LIMIT ${limit} OFFSET ${offset};
+    `,
+    sql`
+      SELECT 
+        COUNT(*)::int as total,
+        COALESCE(SUM(CASE WHEN e.type = 'income' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_income,
+        COALESCE(SUM(CASE WHEN e.type = 'expense' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_expense,
+        COALESCE(SUM(CASE WHEN e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_all_cost,
+        COALESCE(SUM(CASE WHEN e.is_voided = false THEN COALESCE(e.quantity, 1) ELSE 0 END), 0)::numeric as total_quantity,
+        COUNT(CASE WHEN e.is_voided = false THEN 1 END)::int as active_count
+      FROM ledger_entries e
+      JOIN ledger_categories c ON e.category_id = c.id
+      WHERE ${whereClause};
+    `,
+    sql`
+      SELECT 
+        MAX(e.title) as item_name,
+        COALESCE(e.unit, 'pcs') as unit,
+        MAX(c.name) as category_name,
+        SUM(COALESCE(e.quantity, 1))::numeric as total_quantity,
+        SUM(e.amount_minor)::bigint as total_cost_minor,
+        COUNT(*)::int as purchase_count
+      FROM ledger_entries e
+      JOIN ledger_categories c ON e.category_id = c.id
+      WHERE ${whereClause} AND e.is_voided = false
+      GROUP BY LOWER(TRIM(e.title)), COALESCE(e.unit, 'pcs')
+      ORDER BY total_cost_minor DESC
+      LIMIT 50;
+    `,
+  ]);
 
   const entries: LedgerEntry[] = rawEntries.map((r: any) => ({
     ...r,
@@ -632,51 +575,13 @@ export async function getLedgerEntries(
     amount_minor: Number(r.amount_minor),
   }));
 
-  // 2. Fetch total count for pagination
-  const countResult = await sql`
-    SELECT COUNT(*)::int as total
-    FROM ledger_entries e
-    JOIN ledger_categories c ON e.category_id = c.id
-    WHERE ${whereClause};
-  `;
-  const totalCount = Number(countResult[0]?.total || 0);
-
-  // 3. Compute filtered totals server-side across ALL matching rows (excluding voided)
-  const totalsResult = await sql`
-    SELECT 
-      COALESCE(SUM(CASE WHEN e.type = 'income' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_income,
-      COALESCE(SUM(CASE WHEN e.type = 'expense' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_expense,
-      COALESCE(SUM(CASE WHEN e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_all_cost,
-      COALESCE(SUM(CASE WHEN e.is_voided = false THEN COALESCE(e.quantity, 1) ELSE 0 END), 0)::numeric as total_quantity,
-      COUNT(CASE WHEN e.is_voided = false THEN 1 END)::int as active_count
-    FROM ledger_entries e
-    JOIN ledger_categories c ON e.category_id = c.id
-    WHERE ${whereClause};
-  `;
-
+  const totalCount = Number(totalsResult[0]?.total || 0);
   const totalIncomeMinor = Number(totalsResult[0]?.total_income || 0);
   const totalExpenseMinor = Number(totalsResult[0]?.total_expense || 0);
   const totalCostMinor = Number(totalsResult[0]?.total_all_cost || 0);
   const totalQuantity = Number(totalsResult[0]?.total_quantity || 0);
   const activeCount = Number(totalsResult[0]?.active_count || 0);
   const netMinor = totalIncomeMinor - totalExpenseMinor;
-
-  // 4. Compute aggregated items breakdown for the selected Date / Month / Year filter
-  const itemsBreakdownRows = await sql`
-    SELECT 
-      MAX(e.title) as item_name,
-      COALESCE(e.unit, 'pcs') as unit,
-      MAX(c.name) as category_name,
-      SUM(COALESCE(e.quantity, 1))::numeric as total_quantity,
-      SUM(e.amount_minor)::bigint as total_cost_minor,
-      COUNT(*)::int as purchase_count
-    FROM ledger_entries e
-    JOIN ledger_categories c ON e.category_id = c.id
-    WHERE ${whereClause} AND e.is_voided = false
-    GROUP BY LOWER(TRIM(e.title)), COALESCE(e.unit, 'pcs')
-    ORDER BY total_cost_minor DESC
-    LIMIT 50;
-  `;
 
   const itemsBreakdown: AggregatedItemSummary[] = itemsBreakdownRows.map((row: any) => {
     const qty = Number(row.total_quantity || 1);
@@ -721,59 +626,59 @@ export async function getLedgerSummary(
   monthParam?: number,
   yearParam?: number
 ) {
-  await ensureLedgerSchema();
+  await ensureAppSchema();
 
   const targetDate = dateStr || new Date().toISOString().split("T")[0];
   const parsedDate = new Date(targetDate);
   const targetMonth = monthParam || parsedDate.getMonth() + 1;
   const targetYear = yearParam || parsedDate.getFullYear();
 
-  // Compute Daily, Weekly, Monthly, Yearly totals in a single query
-  const horizonRows = await sql`
-    SELECT 
-      -- Specific Day
-      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as day_cost_minor,
-      COUNT(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN 1 END)::int as day_entries,
-      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as day_quantity,
+  // Compute Daily, Weekly, Monthly, Yearly totals and Top Category in PARALLEL
+  const [horizonRows, topExpense] = await Promise.all([
+    sql`
+      SELECT 
+        -- Specific Day
+        COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as day_cost_minor,
+        COUNT(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN 1 END)::int as day_entries,
+        COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as day_quantity,
 
-      -- Weekly (7-day window ending on targetDate)
-      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as week_cost_minor,
-      COUNT(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN 1 END)::int as week_entries,
-      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as week_quantity,
+        -- Weekly (7-day window ending on targetDate)
+        COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as week_cost_minor,
+        COUNT(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN 1 END)::int as week_entries,
+        COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as week_quantity,
 
-      -- Monthly (targetMonth & targetYear)
-      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN amount_minor ELSE 0 END), 0)::bigint as month_cost_minor,
-      COUNT(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN 1 END)::int as month_entries,
-      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as month_quantity,
+        -- Monthly (targetMonth & targetYear)
+        COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN amount_minor ELSE 0 END), 0)::bigint as month_cost_minor,
+        COUNT(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN 1 END)::int as month_entries,
+        COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as month_quantity,
 
-      -- Yearly (targetYear)
-      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN amount_minor ELSE 0 END), 0)::bigint as year_cost_minor,
-      COUNT(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN 1 END)::int as year_entries,
-      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as year_quantity,
+        -- Yearly (targetYear)
+        COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN amount_minor ELSE 0 END), 0)::bigint as year_cost_minor,
+        COUNT(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN 1 END)::int as year_entries,
+        COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as year_quantity,
 
-      -- Payment split on targetDate
-      COALESCE(SUM(CASE WHEN payment_method = 'cash' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as cash_minor,
-      COALESCE(SUM(CASE WHEN payment_method = 'card' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as card_minor,
-      COALESCE(SUM(CASE WHEN payment_method = 'online' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as online_minor,
-      COALESCE(SUM(CASE WHEN payment_method = 'other' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as other_minor
-    FROM ledger_entries
-    WHERE tenant_id = ${tenantId};
-  `;
-
-  // Top category for the selected month
-  const topExpense = await sql`
-    SELECT c.name, SUM(e.amount_minor)::bigint as amount_minor
-    FROM ledger_entries e
-    JOIN ledger_categories c ON e.category_id = c.id
-    WHERE 
-      e.tenant_id = ${tenantId}
-      AND e.is_voided = false
-      AND EXTRACT(MONTH FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${targetMonth}
-      AND EXTRACT(YEAR FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${targetYear}
-    GROUP BY c.name
-    ORDER BY amount_minor DESC
-    LIMIT 1;
-  `;
+        -- Payment split on targetDate
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as cash_minor,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as card_minor,
+        COALESCE(SUM(CASE WHEN payment_method = 'online' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as online_minor,
+        COALESCE(SUM(CASE WHEN payment_method = 'other' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as other_minor
+      FROM ledger_entries
+      WHERE tenant_id = ${tenantId};
+    `,
+    sql`
+      SELECT c.name, SUM(e.amount_minor)::bigint as amount_minor
+      FROM ledger_entries e
+      JOIN ledger_categories c ON e.category_id = c.id
+      WHERE 
+        e.tenant_id = ${tenantId}
+        AND e.is_voided = false
+        AND EXTRACT(MONTH FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${targetMonth}
+        AND EXTRACT(YEAR FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${targetYear}
+      GROUP BY c.name
+      ORDER BY amount_minor DESC
+      LIMIT 1;
+    `,
+  ]);
 
   const s = horizonRows[0] || {};
   const dayCostMinor = Number(s.day_cost_minor || 0);
@@ -839,61 +744,62 @@ export async function getLedgerChartData(
   rangeStr: string = "30d",
   timezone: string = "Asia/Karachi"
 ) {
-  await ensureLedgerSchema();
+  await ensureAppSchema();
 
   const days = rangeStr === "7d" ? 7 : rangeStr === "90d" ? 90 : 30;
 
-  const dailySeries = await sql`
-    WITH date_range AS (
-      SELECT (NOW() AT TIME ZONE ${timezone})::date - (n || ' days')::interval as day_date
-      FROM generate_series(0, ${days - 1}) n
-    )
-    SELECT 
-      TO_CHAR(d.day_date, 'YYYY-MM-DD') as date,
-      TO_CHAR(d.day_date, 'Mon DD') as label,
-      COALESCE(SUM(CASE WHEN e.type = 'income' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as income_minor,
-      COALESCE(SUM(CASE WHEN e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as expense_minor,
-      COUNT(CASE WHEN e.is_voided = false THEN 1 END)::int as item_count
-    FROM date_range d
-    LEFT JOIN ledger_entries e 
-      ON e.tenant_id = ${tenantId}
-      AND (e.occurred_at AT TIME ZONE ${timezone})::date = d.day_date::date
-    GROUP BY d.day_date
-    ORDER BY d.day_date ASC;
-  `;
-
-  const categoryBreakdown = await sql`
-    SELECT 
-      c.name,
-      SUM(e.amount_minor)::bigint as amount_minor,
-      COUNT(*)::int as count
-    FROM ledger_entries e
-    JOIN ledger_categories c ON e.category_id = c.id
-    WHERE 
-      e.tenant_id = ${tenantId}
-      AND e.is_voided = false
-      AND e.occurred_at >= (NOW() - (${days || " days"}::interval))
-    GROUP BY c.name
-    ORDER BY amount_minor DESC
-    LIMIT 8;
-  `;
-
-  const topItems = await sql`
-    SELECT 
-      MAX(e.title) as name,
-      COALESCE(e.unit, 'pcs') as unit,
-      SUM(COALESCE(e.quantity, 1))::numeric as total_quantity,
-      SUM(e.amount_minor)::bigint as amount_minor,
-      COUNT(*)::int as count
-    FROM ledger_entries e
-    WHERE 
-      e.tenant_id = ${tenantId}
-      AND e.is_voided = false
-      AND e.occurred_at >= (NOW() - (${days || " days"}::interval))
-    GROUP BY LOWER(TRIM(e.title)), COALESCE(e.unit, 'pcs')
-    ORDER BY amount_minor DESC
-    LIMIT 6;
-  `;
+  // Execute all 3 chart analytics queries in PARALLEL
+  const [dailySeries, categoryBreakdown, topItems] = await Promise.all([
+    sql`
+      WITH date_range AS (
+        SELECT (NOW() AT TIME ZONE ${timezone})::date - (n || ' days')::interval as day_date
+        FROM generate_series(0, ${days - 1}) n
+      )
+      SELECT 
+        TO_CHAR(d.day_date, 'YYYY-MM-DD') as date,
+        TO_CHAR(d.day_date, 'Mon DD') as label,
+        COALESCE(SUM(CASE WHEN e.type = 'income' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as income_minor,
+        COALESCE(SUM(CASE WHEN e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as expense_minor,
+        COUNT(CASE WHEN e.is_voided = false THEN 1 END)::int as item_count
+      FROM date_range d
+      LEFT JOIN ledger_entries e 
+        ON e.tenant_id = ${tenantId}
+        AND (e.occurred_at AT TIME ZONE ${timezone})::date = d.day_date::date
+      GROUP BY d.day_date
+      ORDER BY d.day_date ASC;
+    `,
+    sql`
+      SELECT 
+        c.name,
+        SUM(e.amount_minor)::bigint as amount_minor,
+        COUNT(*)::int as count
+      FROM ledger_entries e
+      JOIN ledger_categories c ON e.category_id = c.id
+      WHERE 
+        e.tenant_id = ${tenantId}
+        AND e.is_voided = false
+        AND e.occurred_at >= (NOW() - (${days || " days"}::interval))
+      GROUP BY c.name
+      ORDER BY amount_minor DESC
+      LIMIT 8;
+    `,
+    sql`
+      SELECT 
+        MAX(e.title) as name,
+        COALESCE(e.unit, 'pcs') as unit,
+        SUM(COALESCE(e.quantity, 1))::numeric as total_quantity,
+        SUM(e.amount_minor)::bigint as amount_minor,
+        COUNT(*)::int as count
+      FROM ledger_entries e
+      WHERE 
+        e.tenant_id = ${tenantId}
+        AND e.is_voided = false
+        AND e.occurred_at >= (NOW() - (${days || " days"}::interval))
+      GROUP BY LOWER(TRIM(e.title)), COALESCE(e.unit, 'pcs')
+      ORDER BY amount_minor DESC
+      LIMIT 6;
+    `,
+  ]);
 
   const categoriesFormatted = categoryBreakdown.map((c: any) => ({
     name: c.name,

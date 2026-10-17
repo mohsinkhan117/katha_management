@@ -20,7 +20,7 @@ import { LedgerDetailDrawer } from "@/components/ledger/LedgerDetailDrawer";
 
 export default function CommercialLedgerPage() {
   const user = useUser();
-  const { activeTenant, hasAccess } = useTenant();
+  const { activeTenant, hasAccess, isLoading } = useTenant();
 
   // Categories state
   const [categories, setCategories] = useState<LedgerCategory[]>([]);
@@ -48,17 +48,18 @@ export default function CommercialLedgerPage() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  const userEmail = user?.primaryEmail || activeTenant?.admin_email || "";
+
   useEffect(() => {
+    if (!userEmail) return;
     let isMounted = true;
     async function loadCategories() {
       try {
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = {
+          "x-user-email": userEmail,
+        };
         if (activeTenant?.id) {
           headers["x-tenant-id"] = activeTenant.id;
-        }
-        const email = user?.primaryEmail || activeTenant?.admin_email;
-        if (email) {
-          headers["x-user-email"] = email;
         }
         const res = await fetch("/api/ledger/categories", {
           headers,
@@ -79,13 +80,13 @@ export default function CommercialLedgerPage() {
     return () => {
       isMounted = false;
     };
-  }, [refreshTrigger, activeTenant?.id, user?.primaryEmail, activeTenant?.admin_email]);
+  }, [refreshTrigger, userEmail]);
 
   const handleCategoryCreated = (newCat: LedgerCategory) => {
     setCategories((prev) => [...prev, newCat]);
   };
 
-  if (user && !hasAccess) {
+  if (!isLoading && user && !hasAccess) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-6 space-y-4">
         <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600">

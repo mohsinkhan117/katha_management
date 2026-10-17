@@ -51,18 +51,19 @@ export function LedgerCharts({ refreshTrigger }: LedgerChartsProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
 
+  const userEmail = user?.primaryEmail || activeTenant?.admin_email || "";
+
   useEffect(() => {
+    if (!userEmail) return;
     let isMounted = true;
     async function fetchChart() {
       setIsLoading(true);
       try {
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = {
+          "x-user-email": userEmail,
+        };
         if (activeTenant?.id) {
           headers["x-tenant-id"] = activeTenant.id;
-        }
-        const email = user?.primaryEmail || activeTenant?.admin_email;
-        if (email) {
-          headers["x-user-email"] = email;
         }
         const res = await fetch(`/api/ledger/chart?range=${range}`, {
           headers,
@@ -82,7 +83,7 @@ export function LedgerCharts({ refreshTrigger }: LedgerChartsProps) {
     return () => {
       isMounted = false;
     };
-  }, [range, refreshTrigger, activeTenant?.id, user?.primaryEmail]);
+  }, [range, refreshTrigger, userEmail]);
 
   const formatCurrency = (minor: number) => {
     return new Intl.NumberFormat("en-PK", {

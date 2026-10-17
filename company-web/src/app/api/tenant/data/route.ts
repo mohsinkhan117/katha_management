@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/neon/db";
+import {
+  sql,
+  ensureAppSchema,
+  getCachedTenantByEmail,
+  setCachedTenantByEmail,
+  fetchTenantDashboardPayload,
+} from "@/lib/neon/db";
 import { stackServerApp } from "@/stack";
 
 async function getAuthenticatedUserEmail(req: NextRequest): Promise<string | null> {
@@ -23,130 +29,14 @@ async function getAuthenticatedUserEmail(req: NextRequest): Promise<string | nul
   return email || null;
 }
 
-// Ensure schema exists in Neon Postgres
-async function ensureTables() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS companies (
-      id VARCHAR(64) PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      slug VARCHAR(128) UNIQUE NOT NULL,
-      admin_email VARCHAR(255) NOT NULL,
-      phone VARCHAR(64),
-      address TEXT,
-      plan_tier VARCHAR(32) DEFAULT 'free_trial',
-      max_distributors INT DEFAULT 25,
-      is_active BOOLEAN DEFAULT true,
-      trial_started_at TIMESTAMP WITH TIME ZONE,
-      expires_at TIMESTAMP WITH TIME ZONE,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS distributor_invite_tokens (
-      id VARCHAR(64) PRIMARY KEY,
-      token VARCHAR(32) UNIQUE NOT NULL,
-      company_id VARCHAR(64) NOT NULL,
-      territory_id VARCHAR(64),
-      territory_name VARCHAR(255),
-      distributor_name VARCHAR(255),
-      phone VARCHAR(64),
-      device_id VARCHAR(128),
-      is_claimed BOOLEAN DEFAULT false,
-      claimed_at TIMESTAMP WITH TIME ZONE,
-      expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '30 days'),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS orders (
-      id VARCHAR(64) PRIMARY KEY,
-      company_id VARCHAR(64) NOT NULL,
-      order_number VARCHAR(64) NOT NULL,
-      party_name VARCHAR(255) NOT NULL,
-      distributor_name VARCHAR(255),
-      items_count INT DEFAULT 1,
-      total_amount NUMERIC(12, 2) DEFAULT 0,
-      paid_amount NUMERIC(12, 2) DEFAULT 0,
-      status VARCHAR(32) DEFAULT 'Pending',
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS products (
-      id VARCHAR(64) PRIMARY KEY,
-      company_id VARCHAR(64) NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      sku VARCHAR(64),
-      category VARCHAR(128),
-      unit VARCHAR(64) DEFAULT 'unit',
-      description TEXT,
-      image_url TEXT,
-      retail_price NUMERIC(12, 2) DEFAULT 0,
-      unit_price NUMERIC(12, 2) DEFAULT 0,
-      discount_percentage NUMERIC(5, 2) DEFAULT 0,
-      final_price NUMERIC(12, 2) DEFAULT 0,
-      cost_price NUMERIC(12, 2),
-      stock_quantity INT DEFAULT 0,
-      status VARCHAR(32) DEFAULT 'inStock',
-      is_active BOOLEAN DEFAULT true,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-
-  // Safely ensure all columns exist if table was created in an earlier migration
-  try {
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS unit VARCHAR(64) DEFAULT 'unit';`;
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;`;
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;`;
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS retail_price NUMERIC(12, 2) DEFAULT 0;`;
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percentage NUMERIC(5, 2) DEFAULT 0;`;
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS final_price NUMERIC(12, 2) DEFAULT 0;`;
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price NUMERIC(12, 2);`;
-    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'inStock';`;
-  } catch (err: any) {
-    // Ignore if column already exists
-  }
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS product_sizes (
-      id VARCHAR(64) PRIMARY KEY,
-      product_id VARCHAR(64) NOT NULL,
-      company_id VARCHAR(64) NOT NULL,
-      label VARCHAR(128) NOT NULL,
-      price NUMERIC(12, 2) NOT NULL,
-      discount_percentage NUMERIC(5, 2) DEFAULT 0,
-      final_price NUMERIC(12, 2) NOT NULL,
-      cost_price NUMERIC(12, 2),
-      sort_order INT DEFAULT 0,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS parties (
-      id VARCHAR(64) PRIMARY KEY,
-      company_id VARCHAR(64) NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      owner_name VARCHAR(255),
-      phone VARCHAR(64),
-      territory VARCHAR(128),
-      balance NUMERIC(12, 2) DEFAULT 0,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-}
-
 // GET /api/tenant/data?companyId=...&slug=...
 export async function GET(req: NextRequest) {
   try {
-    await ensureTables();
+    const [, sessionEmail] = await Promise.all([
+      ensureAppSchema(),
+      getAuthenticatedUserEmail(req),
+    ]);
 
-    const sessionEmail = await getAuthenticatedUserEmail(req);
     if (!sessionEmail) {
       return NextResponse.json(
         { success: false, error: "Unauthorized: Please sign in." },
@@ -154,13 +44,19 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Resolve company strictly owned by the signed-in user's email
-    const compRows = await sql`
-      SELECT * FROM companies
-      WHERE LOWER(admin_email) = ${sessionEmail}
-      LIMIT 1;
-    `;
-    const company = compRows.length > 0 ? compRows[0] : null;
+    // Resolve company strictly owned by the signed-in user's email (with fast cache)
+    let company = getCachedTenantByEmail(sessionEmail);
+    if (!company) {
+      const compRows = await sql`
+        SELECT * FROM companies
+        WHERE LOWER(admin_email) = ${sessionEmail}
+        LIMIT 1;
+      `;
+      company = compRows.length > 0 ? compRows[0] : null;
+      if (company) {
+        setCachedTenantByEmail(sessionEmail, company);
+      }
+    }
 
     if (!company) {
       return NextResponse.json({
@@ -171,139 +67,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Fetch distributors / invite tokens for THIS tenant
-    const distributors = await sql`
-      SELECT 
-        id,
-        token as "inviteToken",
-        COALESCE(distributor_name, 'Pending Claim') as name,
-        COALESCE(phone, 'Unassigned') as phone,
-        COALESCE(territory_name, 'General Zone') as territory,
-        is_claimed as "isClaimed",
-        created_at as "createdAt"
-      FROM distributor_invite_tokens
-      WHERE company_id = ${company.id}
-      ORDER BY created_at DESC;
-    `;
-
-    // Fetch orders for THIS tenant
-    const orders = await sql`
-      SELECT 
-        id,
-        order_number as "orderNumber",
-        party_name as "partyName",
-        distributor_name as "distributorName",
-        items_count as "itemsCount",
-        total_amount as "totalAmount",
-        paid_amount as "paidAmount",
-        status,
-        created_at as "date"
-      FROM orders
-      WHERE company_id = ${company.id}
-      ORDER BY created_at DESC;
-    `;
-
-    // Fetch products with their sizes for THIS tenant
-    const rawProducts = await sql`
-      SELECT 
-        id,
-        name,
-        sku,
-        category,
-        COALESCE(unit, 'unit') as unit,
-        description,
-        image_url as "imageUrl",
-        COALESCE(retail_price, unit_price, 0) as "retailPrice",
-        COALESCE(unit_price, retail_price, 0) as "unitPrice",
-        COALESCE(discount_percentage, 0) as "discountPercentage",
-        COALESCE(final_price, unit_price, 0) as "finalPrice",
-        cost_price as "costPrice",
-        COALESCE(stock_quantity, 0) as "stockQuantity",
-        COALESCE(status, 'inStock') as status,
-        is_active as "isActive",
-        created_at as "createdAt"
-      FROM products
-      WHERE company_id = ${company.id}
-      ORDER BY created_at DESC;
-    `;
-
-    const rawSizes = await sql`
-      SELECT 
-        id,
-        product_id as "productId",
-        label,
-        price,
-        COALESCE(discount_percentage, 0) as "discountPercentage",
-        final_price as "finalPrice",
-        cost_price as "costPrice",
-        COALESCE(sort_order, 0) as "sortOrder"
-      FROM product_sizes
-      WHERE company_id = ${company.id}
-      ORDER BY sort_order ASC, price ASC;
-    `;
-
-    const products = rawProducts.map((p: any) => ({
-      ...p,
-      sizes: rawSizes.filter((s: any) => s.productId === p.id),
-    }));
-
-    // Fetch parties for THIS tenant
-    const parties = await sql`
-      SELECT 
-        id,
-        name,
-        owner_name as "ownerName",
-        phone,
-        territory,
-        balance,
-        created_at as "createdAt"
-      FROM parties
-      WHERE company_id = ${company.id}
-      ORDER BY created_at DESC;
-    `;
-
-    // Calculate aggregated metrics from real database orders
-    const totalOrdersCount = orders.length;
-    const totalSalesNum = orders.reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
-    const totalPaidNum = orders.reduce((sum: number, o: any) => sum + Number(o.paidAmount || 0), 0);
-    const totalProfitNum = Math.round(totalSalesNum * 0.22); // gross profit margin
-
-    // Status breakdown
-    const deliveredCount = orders.filter((o: any) => o.status === "Delivered" || o.status === "Completed").length;
-    const inTransitCount = orders.filter((o: any) => o.status === "In Transit").length;
-    const pendingCount = orders.filter((o: any) => o.status === "Pending").length;
-    const cancelledCount = orders.filter((o: any) => o.status === "Cancelled").length;
-
-    const totalCalculated = totalOrdersCount || 1;
-    const orderStatuses = [
-      { status: "Delivered", count: deliveredCount, percentage: Number(((deliveredCount / totalCalculated) * 100).toFixed(1)), color: "bg-emerald-500" },
-      { status: "In Transit", count: inTransitCount, percentage: Number(((inTransitCount / totalCalculated) * 100).toFixed(1)), color: "bg-blue-500" },
-      { status: "Pending", count: pendingCount, percentage: Number(((pendingCount / totalCalculated) * 100).toFixed(1)), color: "bg-amber-500" },
-      { status: "Cancelled", count: cancelledCount, percentage: Number(((cancelledCount / totalCalculated) * 100).toFixed(1)), color: "bg-rose-500" },
-    ];
-
-    // Collections breakdown
-    const outstandingReceivables = Math.max(0, totalSalesNum - totalPaidNum);
-    const recoveryRate = totalSalesNum > 0 ? Number(((totalPaidNum / totalSalesNum) * 100).toFixed(1)) : 0;
+    const payload = await fetchTenantDashboardPayload(company.id);
 
     return NextResponse.json({
       success: true,
       hasAccess: true,
       isCustomTenant: true,
       company,
-      metrics: {
-        totalOrders: totalOrdersCount,
-        totalSales: totalSalesNum,
-        totalPaid: totalPaidNum,
-        totalProfit: totalProfitNum,
-        outstandingReceivables,
-        recoveryRate,
-      },
-      orderStatuses,
-      distributors,
-      orders,
-      products,
-      parties,
+      ...payload,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -316,8 +87,12 @@ export async function GET(req: NextRequest) {
 // POST /api/tenant/data - Create orders, tokens, products with sizes, or record collections
 export async function POST(req: NextRequest) {
   try {
-    await ensureTables();
-    const sessionEmail = await getAuthenticatedUserEmail(req);
+    const [, sessionEmail, body] = await Promise.all([
+      ensureAppSchema(),
+      getAuthenticatedUserEmail(req),
+      req.json().catch(() => ({})),
+    ]);
+
     if (!sessionEmail) {
       return NextResponse.json(
         { success: false, error: "Unauthorized: Please sign in." },
@@ -325,19 +100,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const compRows = await sql`
-      SELECT id, is_active, expires_at FROM companies
-      WHERE LOWER(admin_email) = ${sessionEmail}
-      LIMIT 1;
-    `;
-    if (compRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "No tenant company found for your account." },
-        { status: 403 }
-      );
+    let company = getCachedTenantByEmail(sessionEmail);
+    if (!company) {
+      const compRows = await sql`
+        SELECT * FROM companies
+        WHERE LOWER(admin_email) = ${sessionEmail}
+        LIMIT 1;
+      `;
+      if (compRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "No tenant company found for your account." },
+          { status: 403 }
+        );
+      }
+      company = compRows[0];
+      setCachedTenantByEmail(sessionEmail, company);
     }
 
-    const company = compRows[0];
     const isExpired = company.expires_at && new Date(company.expires_at).getTime() < Date.now();
     if (company.is_active === false || isExpired) {
       return NextResponse.json(
@@ -351,7 +130,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
     const { action } = body;
     const companyId = company.id as string;
 
@@ -391,7 +169,16 @@ export async function POST(req: NextRequest) {
           ${Number(paidAmount || 0)},
           ${status || "Pending"},
           NOW()
-        ) RETURNING *;
+        ) RETURNING
+          id,
+          order_number as "orderNumber",
+          party_name as "partyName",
+          distributor_name as "distributorName",
+          items_count as "itemsCount",
+          total_amount as "totalAmount",
+          paid_amount as "paidAmount",
+          status,
+          created_at as "date";
       `;
 
       return NextResponse.json({
@@ -416,7 +203,16 @@ export async function POST(req: NextRequest) {
           UPDATE orders
           SET paid_amount = paid_amount + ${Number(amount)}
           WHERE id = ${orderId} AND company_id = ${companyId}
-          RETURNING *;
+          RETURNING
+            id,
+            order_number as "orderNumber",
+            party_name as "partyName",
+            distributor_name as "distributorName",
+            items_count as "itemsCount",
+            total_amount as "totalAmount",
+            paid_amount as "paidAmount",
+            status,
+            created_at as "date";
         `;
         return NextResponse.json({
           success: true,
@@ -448,7 +244,16 @@ export async function POST(req: NextRequest) {
           ${Number(amount)},
           'Delivered',
           NOW()
-        ) RETURNING *;
+        ) RETURNING
+          id,
+          order_number as "orderNumber",
+          party_name as "partyName",
+          distributor_name as "distributorName",
+          items_count as "itemsCount",
+          total_amount as "totalAmount",
+          paid_amount as "paidAmount",
+          status,
+          created_at as "date";
       `;
 
       return NextResponse.json({
@@ -498,105 +303,138 @@ export async function POST(req: NextRequest) {
         ? Number(costPrice)
         : null;
 
-      const rows = await sql`
-        INSERT INTO products (
-          id,
-          company_id,
-          name,
-          sku,
-          category,
-          unit,
-          description,
-          image_url,
-          retail_price,
-          unit_price,
-          discount_percentage,
-          final_price,
-          cost_price,
-          stock_quantity,
-          status,
-          is_active,
-          created_at
-        ) VALUES (
-          ${id},
-          ${companyId},
-          ${name.trim()},
-          ${prodSku},
-          ${category || "General"},
-          ${unit || "unit"},
-          ${description || null},
-          ${imageUrl || null},
-          ${baseRetail},
-          ${baseRetail},
-          ${baseDiscount},
-          ${calculatedFinal},
-          ${baseCost},
-          ${Number(stockQuantity || 0)},
-          ${status || "inStock"},
-          true,
-          NOW()
-        ) RETURNING *;
-      `;
+      const validSizes = Array.isArray(sizes)
+        ? sizes.filter((s: any) => s && s.label && s.label.trim())
+        : [];
 
-      // Insert any size variants if provided
-      if (Array.isArray(sizes) && sizes.length > 0) {
-        for (let i = 0; i < sizes.length; i++) {
-          const s = sizes[i];
-          if (!s.label) continue;
-          const sizeId = `size_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}_${i}`;
-          const sPrice = Number(s.price || 0);
-          const sDiscount = Number(s.discountPercentage || 0);
-          const sFinal = s.finalPrice !== undefined && s.finalPrice !== null
-            ? Number(s.finalPrice)
-            : Number((sPrice * (1 - sDiscount / 100)).toFixed(2));
-          const sCost = s.costPrice !== undefined && s.costPrice !== null && s.costPrice !== ""
-            ? Number(s.costPrice)
-            : null;
+      const sizeInsertPromises = validSizes.map((s: any, i: number) => {
+        const sizeId = `size_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}_${i}`;
+        const sPrice = Number(s.price || 0);
+        const sDiscount = Number(s.discountPercentage || 0);
+        const sFinal = s.finalPrice !== undefined && s.finalPrice !== null
+          ? Number(s.finalPrice)
+          : Number((sPrice * (1 - sDiscount / 100)).toFixed(2));
+        const sCost = s.costPrice !== undefined && s.costPrice !== null && s.costPrice !== ""
+          ? Number(s.costPrice)
+          : null;
 
-          await sql`
-            INSERT INTO product_sizes (
-              id,
-              product_id,
-              company_id,
-              label,
-              price,
-              discount_percentage,
-              final_price,
-              cost_price,
-              sort_order,
-              created_at
-            ) VALUES (
-              ${sizeId},
-              ${id},
-              ${companyId},
-              ${s.label.trim()},
-              ${sPrice},
-              ${sDiscount},
-              ${sFinal},
-              ${sCost},
-              ${i},
-              NOW()
-            );
-          `;
-        }
-      }
+        return sql`
+          INSERT INTO product_sizes (
+            id,
+            product_id,
+            company_id,
+            label,
+            price,
+            discount_percentage,
+            final_price,
+            cost_price,
+            sort_order,
+            created_at
+          ) VALUES (
+            ${sizeId},
+            ${id},
+            ${companyId},
+            ${s.label.trim()},
+            ${sPrice},
+            ${sDiscount},
+            ${sFinal},
+            ${sCost},
+            ${i},
+            NOW()
+          ) RETURNING
+            id,
+            product_id as "productId",
+            label,
+            price,
+            discount_percentage as "discountPercentage",
+            final_price as "finalPrice",
+            cost_price as "costPrice",
+            sort_order as "sortOrder";
+        `;
+      });
+
+      const [rows, ...insertedSizeRows] = await Promise.all([
+        sql`
+          INSERT INTO products (
+            id,
+            company_id,
+            name,
+            sku,
+            category,
+            unit,
+            description,
+            image_url,
+            retail_price,
+            unit_price,
+            discount_percentage,
+            final_price,
+            cost_price,
+            stock_quantity,
+            status,
+            is_active,
+            created_at
+          ) VALUES (
+            ${id},
+            ${companyId},
+            ${name.trim()},
+            ${prodSku},
+            ${category || "General"},
+            ${unit || "unit"},
+            ${description || null},
+            ${imageUrl || null},
+            ${baseRetail},
+            ${baseRetail},
+            ${baseDiscount},
+            ${calculatedFinal},
+            ${baseCost},
+            ${Number(stockQuantity || 0)},
+            ${status || "inStock"},
+            true,
+            NOW()
+          ) RETURNING
+            id,
+            name,
+            sku,
+            category,
+            unit,
+            description,
+            image_url as "imageUrl",
+            retail_price as "retailPrice",
+            unit_price as "unitPrice",
+            discount_percentage as "discountPercentage",
+            final_price as "finalPrice",
+            cost_price as "costPrice",
+            stock_quantity as "stockQuantity",
+            status,
+            is_active as "isActive",
+            created_at as "createdAt";
+        `,
+        ...sizeInsertPromises,
+      ]);
+
+      const createdProduct = {
+        ...rows[0],
+        sizes: insertedSizeRows.map((r: any) => r[0]).filter(Boolean),
+      };
 
       return NextResponse.json({
         success: true,
         message: "Product and size variants added to catalog successfully.",
-        product: rows[0],
+        product: createdProduct,
       });
     }
 
-    // 4. Delete Product and its sizes
+    // 4. Delete Product and its sizes in parallel
     if (action === "delete_product") {
       const { productId } = body;
       if (!productId) {
         return NextResponse.json({ success: false, error: "productId is required" }, { status: 400 });
       }
 
-      await sql`DELETE FROM product_sizes WHERE product_id = ${productId} AND company_id = ${companyId};`;
-      await sql`DELETE FROM products WHERE id = ${productId} AND company_id = ${companyId};`;
+      await Promise.all([
+        sql`DELETE FROM product_sizes WHERE product_id = ${productId} AND company_id = ${companyId};`,
+        sql`DELETE FROM products WHERE id = ${productId} AND company_id = ${companyId};`,
+      ]);
 
       return NextResponse.json({
         success: true,
@@ -628,7 +466,14 @@ export async function POST(req: NextRequest) {
         ${distributorName || null},
         ${phone || null},
         false
-      ) RETURNING *;
+      ) RETURNING
+        id,
+        token as "inviteToken",
+        COALESCE(distributor_name, 'Pending Claim') as name,
+        COALESCE(phone, 'Unassigned') as phone,
+        COALESCE(territory_name, 'General Zone') as territory,
+        is_claimed as "isClaimed",
+        created_at as "createdAt";
     `;
 
     return NextResponse.json({
@@ -643,3 +488,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

@@ -197,13 +197,57 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Helper to recompute metrics & orderStatuses in-memory for instant UI updates
+  const recomputeMetricsFromOrders = useCallback((ordersList: TenantDataPayload["orders"]) => {
+    const totalOrders = ordersList.length;
+    let totalSales = 0;
+    let totalPaid = 0;
+    let deliveredCount = 0;
+    let inTransitCount = 0;
+    let pendingCount = 0;
+    let cancelledCount = 0;
+
+    for (const o of ordersList) {
+      totalSales += Number(o.totalAmount || 0);
+      totalPaid += Number(o.paidAmount || 0);
+      if (o.status === "Delivered" || o.status === "Completed") deliveredCount++;
+      else if (o.status === "In Transit") inTransitCount++;
+      else if (o.status === "Pending") pendingCount++;
+      else if (o.status === "Cancelled") cancelledCount++;
+    }
+
+    const totalProfit = Math.round(totalSales * 0.22);
+    const totalCalculated = totalOrders || 1;
+    const orderStatuses: TenantDataPayload["orderStatuses"] = [
+      { status: "Delivered", count: deliveredCount, percentage: Number(((deliveredCount / totalCalculated) * 100).toFixed(1)), color: "bg-emerald-500" },
+      { status: "In Transit", count: inTransitCount, percentage: Number(((inTransitCount / totalCalculated) * 100).toFixed(1)), color: "bg-blue-500" },
+      { status: "Pending", count: pendingCount, percentage: Number(((pendingCount / totalCalculated) * 100).toFixed(1)), color: "bg-amber-500" },
+      { status: "Cancelled", count: cancelledCount, percentage: Number(((cancelledCount / totalCalculated) * 100).toFixed(1)), color: "bg-rose-500" },
+    ];
+
+    const outstandingReceivables = Math.max(0, totalSales - totalPaid);
+    const recoveryRate = totalSales > 0 ? Number(((totalPaid / totalSales) * 100).toFixed(1)) : 0;
+
+    return {
+      metrics: {
+        totalOrders,
+        totalSales,
+        totalPaid,
+        totalProfit,
+        outstandingReceivables,
+        recoveryRate,
+      },
+      orderStatuses,
+    };
+  }, []);
+
   const refreshTenantData = useCallback(async () => {
     if (activeTenant) {
       await fetchTenantDataFor(activeTenant);
     }
   }, [activeTenant, fetchTenantDataFor]);
 
-  // Load / Sync Tenant ONLY when User is authenticated
+  // Load / Sync Tenant + Dashboard Data in a SINGLE request when User is authenticated
   useEffect(() => {
     let isCancelled = false;
 
@@ -226,9 +270,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Logged-in user:
-        // - If Super Admin provisioned a tenant for this email -> Sign-In binds strictly to that tenant
-        // - If new Sign-Up -> Activates 1-Month Free Tier (expires after 30 days)
+        // Single round-trip: resolves tenant AND fetches operational dashboard data concurrently
         const syncRes = await fetch("/api/tenant", {
           method: "POST",
           credentials: "include",
@@ -236,6 +278,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({
             email: userEmail,
             name: displayName ? `${displayName.charAt(0).toUpperCase() + displayName.slice(1)} Commercial` : undefined,
+            includeData: true,
           }),
         });
         const syncJson = await syncRes.json();
@@ -249,8 +292,13 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
           setDeactivationReason(syncJson.deactivationReason || null);
           setHasAccess(!deactivated);
           setIsCustomTenant(true);
+
           if (!deactivated) {
-            await fetchTenantDataFor(company);
+            if (syncJson.tenantData) {
+              setTenantData(syncJson.tenantData);
+            } else {
+              await fetchTenantDataFor(company);
+            }
           }
           return;
         }
@@ -271,7 +319,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     return () => {
       isCancelled = true;
     };
-  }, [user, fetchTenantDataFor]);
+  }, [user?.primaryEmail, user?.displayName, fetchTenantDataFor]);
 
   const switchTenant = (slugOrId: string) => {
     const found = availableTenants.find(
@@ -293,6 +341,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch("/api/tenant", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: activeTenant.id,
@@ -314,13 +363,14 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Create B2B Order in Neon DB
+  // Create B2B Order in Neon DB (Immediate state update + background sync)
   const createOrder = async (order: { partyName: string; distributorName?: string; totalAmount: number; paidAmount?: number; status?: string; itemsCount?: number }) => {
     if (!activeTenant) return { success: false, error: "No active tenant" };
 
     try {
       const res = await fetch("/api/tenant/data", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create_order",
@@ -330,7 +380,21 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       });
       const json = await res.json();
       if (json.success) {
-        await refreshTenantData();
+        if (json.order) {
+          setTenantData((prev) => {
+            if (!prev) return prev;
+            const nextOrders = [json.order, ...(prev.orders || [])];
+            const { metrics, orderStatuses } = recomputeMetricsFromOrders(nextOrders);
+            return {
+              ...prev,
+              orders: nextOrders,
+              metrics,
+              orderStatuses,
+            };
+          });
+        } else {
+          refreshTenantData();
+        }
         return { success: true };
       }
       return { success: false, error: json.error || "Failed to create order" };
@@ -339,13 +403,14 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Record Collection in Neon DB
+  // Record Collection in Neon DB (Immediate state update + background sync)
   const recordCollection = async (collection: { orderId?: string; partyName?: string; amount: number }) => {
     if (!activeTenant) return { success: false, error: "No active tenant" };
 
     try {
       const res = await fetch("/api/tenant/data", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "record_collection",
@@ -355,7 +420,24 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       });
       const json = await res.json();
       if (json.success) {
-        await refreshTenantData();
+        if (json.order) {
+          setTenantData((prev) => {
+            if (!prev) return prev;
+            const exists = prev.orders.some((o) => o.id === json.order.id);
+            const nextOrders = exists
+              ? prev.orders.map((o) => (o.id === json.order.id ? json.order : o))
+              : [json.order, ...prev.orders];
+            const { metrics, orderStatuses } = recomputeMetricsFromOrders(nextOrders);
+            return {
+              ...prev,
+              orders: nextOrders,
+              metrics,
+              orderStatuses,
+            };
+          });
+        } else {
+          refreshTenantData();
+        }
         return { success: true };
       }
       return { success: false, error: json.error || "Failed to record collection" };
@@ -364,7 +446,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Create Product SKU with Sizes in Neon DB
+  // Create Product SKU with Sizes in Neon DB (Immediate state update)
   const createProduct = async (product: {
     name: string;
     sku?: string;
@@ -392,6 +474,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch("/api/tenant/data", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create_product",
@@ -401,7 +484,17 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       });
       const json = await res.json();
       if (json.success) {
-        await refreshTenantData();
+        if (json.product) {
+          setTenantData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              products: [json.product, ...(prev.products || [])],
+            };
+          });
+        } else {
+          refreshTenantData();
+        }
         return { success: true };
       }
       return { success: false, error: json.error || "Failed to add product" };
@@ -410,13 +503,24 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Delete Product and associated sizes in Neon DB
+  // Delete Product and associated sizes in Neon DB (Immediate optimistic removal)
   const deleteProduct = async (productId: string) => {
     if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    // Optimistically remove immediately for instant UI response
+    const previousProducts = tenantData?.products;
+    setTenantData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        products: (prev.products || []).filter((p) => p.id !== productId),
+      };
+    });
 
     try {
       const res = await fetch("/api/tenant/data", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "delete_product",
@@ -426,22 +530,29 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       });
       const json = await res.json();
       if (json.success) {
-        await refreshTenantData();
         return { success: true };
+      }
+      // Rollback if server rejected
+      if (previousProducts) {
+        setTenantData((prev) => (prev ? { ...prev, products: previousProducts } : prev));
       }
       return { success: false, error: json.error || "Failed to delete product" };
     } catch (err: any) {
+      if (previousProducts) {
+        setTenantData((prev) => (prev ? { ...prev, products: previousProducts } : prev));
+      }
       return { success: false, error: err.message };
     }
   };
 
-  // Issue Distributor Token in Neon DB
+  // Issue Distributor Token in Neon DB (Immediate state update)
   const issueToken = async (tokenData: { territoryName?: string; distributorName?: string; phone?: string }) => {
     if (!activeTenant) return { success: false, error: "No active tenant" };
 
     try {
       const res = await fetch("/api/tenant/data", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId: activeTenant.id,
@@ -450,7 +561,13 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       });
       const json = await res.json();
       if (json.success && json.token) {
-        await refreshTenantData();
+        setTenantData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            distributors: [json.token, ...(prev.distributors || [])],
+          };
+        });
         return { success: true, token: json.token };
       }
       return { success: false, error: json.error || "Failed to generate token" };

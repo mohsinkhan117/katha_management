@@ -1,42 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/neon/db";
+import {
+  sql,
+  ensureAppSchema,
+  getCachedTenantByEmail,
+  setCachedTenantByEmail,
+  invalidateTenantCache,
+  fetchTenantDashboardPayload,
+} from "@/lib/neon/db";
 import { stackServerApp } from "@/stack";
-
-// Ensure companies table exists in Neon Postgres with 1-month free trial columns
-async function ensureCompaniesTable() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS companies (
-      id VARCHAR(64) PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      slug VARCHAR(128) UNIQUE NOT NULL,
-      admin_email VARCHAR(255) NOT NULL,
-      phone VARCHAR(64),
-      address TEXT,
-      plan_tier VARCHAR(32) DEFAULT 'free_trial',
-      max_distributors INT DEFAULT 25,
-      is_active BOOLEAN DEFAULT true,
-      trial_started_at TIMESTAMP WITH TIME ZONE,
-      expires_at TIMESTAMP WITH TIME ZONE,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
-
-  await sql`
-    ALTER TABLE companies
-      ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP WITH TIME ZONE,
-      ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
-  `;
-
-  // Auto-deactivate any tenant whose 1-month free trial or subscription has expired
-  await sql`
-    UPDATE companies
-    SET is_active = false, updated_at = NOW()
-    WHERE is_active = true
-      AND expires_at IS NOT NULL
-      AND expires_at < NOW();
-  `;
-}
 
 function enrichCompanyStatus(company: any) {
   if (!company) return null;
@@ -80,9 +51,11 @@ async function getAuthenticatedEmail(req: NextRequest): Promise<{ user: any; ema
 // GET: Retrieve ONLY the authenticated user's own tenant
 export async function GET(req: NextRequest) {
   try {
-    await ensureCompaniesTable();
+    const [, { email: sessionEmail }] = await Promise.all([
+      ensureAppSchema(),
+      getAuthenticatedEmail(req),
+    ]);
 
-    const { email: sessionEmail } = await getAuthenticatedEmail(req);
     if (!sessionEmail) {
       return NextResponse.json(
         { success: false, error: "Authentication required. Please sign in." },
@@ -90,27 +63,34 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const rows = await sql`
-      SELECT 
-        id,
-        name,
-        slug,
-        admin_email,
-        phone,
-        address,
-        plan_tier,
-        max_distributors,
-        is_active,
-        trial_started_at,
-        expires_at,
-        created_at,
-        updated_at
-      FROM companies
-      WHERE LOWER(admin_email) = ${sessionEmail}
-      LIMIT 1;
-    `;
+    let rawCompany = getCachedTenantByEmail(sessionEmail);
+    if (!rawCompany) {
+      const rows = await sql`
+        SELECT 
+          id,
+          name,
+          slug,
+          admin_email,
+          phone,
+          address,
+          plan_tier,
+          max_distributors,
+          is_active,
+          trial_started_at,
+          expires_at,
+          created_at,
+          updated_at
+        FROM companies
+        WHERE LOWER(admin_email) = ${sessionEmail}
+        LIMIT 1;
+      `;
+      rawCompany = rows.length > 0 ? rows[0] : null;
+      if (rawCompany) {
+        setCachedTenantByEmail(sessionEmail, rawCompany);
+      }
+    }
 
-    const company = rows.length > 0 ? enrichCompanyStatus(rows[0]) : null;
+    const company = rawCompany ? enrichCompanyStatus(rawCompany) : null;
 
     return NextResponse.json({
       success: true,
@@ -130,11 +110,13 @@ export async function GET(req: NextRequest) {
 // 2) If Company signs up for the first time -> Activates 1-Month Free Tier (`free_trial`, expires in 30 days, auto-deactivates after 1 month).
 export async function POST(req: NextRequest) {
   try {
-    await ensureCompaniesTable();
-    const { user, email: sessionEmail } = await getAuthenticatedEmail(req);
-    const body = await req.json();
-    const { email: bodyEmail, name, phone, address } = body;
+    const [, { user, email: sessionEmail }, body] = await Promise.all([
+      ensureAppSchema(),
+      getAuthenticatedEmail(req),
+      req.json().catch(() => ({})),
+    ]);
 
+    const { email: bodyEmail, name, phone, address, includeData } = body;
     const cleanEmail = (sessionEmail || bodyEmail || "").trim().toLowerCase();
 
     if (!sessionEmail || !cleanEmail) {
@@ -145,19 +127,33 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Check if Super Admin provisioned a tenant or company previously signed up
-    const existing = await sql`
-      SELECT * FROM companies
-      WHERE LOWER(admin_email) = ${sessionEmail}
-      LIMIT 1;
-    `;
+    let rawCompany = getCachedTenantByEmail(sessionEmail);
+    if (!rawCompany) {
+      const existing = await sql`
+        SELECT * FROM companies
+        WHERE LOWER(admin_email) = ${sessionEmail}
+        LIMIT 1;
+      `;
+      if (existing && existing.length > 0) {
+        rawCompany = existing[0];
+        setCachedTenantByEmail(sessionEmail, rawCompany);
+      }
+    }
 
-    if (existing && existing.length > 0) {
-      const enriched = enrichCompanyStatus(existing[0]);
+    if (rawCompany) {
+      const enriched = enrichCompanyStatus(rawCompany);
+      const isDeactivated = !enriched.is_active;
+      const tenantData =
+        includeData && !isDeactivated
+          ? await fetchTenantDashboardPayload(enriched.id)
+          : null;
+
       return NextResponse.json({
         success: true,
         company: enriched,
+        tenantData,
         isNew: false,
-        isDeactivated: !enriched.is_active,
+        isDeactivated,
         deactivationReason: enriched.is_expired
           ? "Your 1-month Free Tier trial has expired and your tenant has been automatically deactivated. Please contact Super Admin to upgrade or renew your subscription."
           : !enriched.is_active
@@ -216,11 +212,35 @@ export async function POST(req: NextRequest) {
       RETURNING *;
     `;
 
+    setCachedTenantByEmail(sessionEmail, inserted[0]);
     const enriched = enrichCompanyStatus(inserted[0]);
+    const tenantData = includeData
+      ? {
+          metrics: {
+            totalOrders: 0,
+            totalSales: 0,
+            totalPaid: 0,
+            totalProfit: 0,
+            outstandingReceivables: 0,
+            recoveryRate: 0,
+          },
+          orderStatuses: [
+            { status: "Delivered", count: 0, percentage: 0, color: "bg-emerald-500" },
+            { status: "In Transit", count: 0, percentage: 0, color: "bg-blue-500" },
+            { status: "Pending", count: 0, percentage: 0, color: "bg-amber-500" },
+            { status: "Cancelled", count: 0, percentage: 0, color: "bg-rose-500" },
+          ],
+          distributors: [],
+          orders: [],
+          products: [],
+          parties: [],
+        }
+      : null;
 
     return NextResponse.json({
       success: true,
       company: enriched,
+      tenantData,
       isNew: true,
       isDeactivated: false,
       message: "1-Month Free Tier activated! Your trial is active for 30 days.",
@@ -236,8 +256,12 @@ export async function POST(req: NextRequest) {
 // PATCH: Update tenant company profile settings (only for the signed-in owner)
 export async function PATCH(req: NextRequest) {
   try {
-    await ensureCompaniesTable();
-    const { email: sessionEmail } = await getAuthenticatedEmail(req);
+    const [, { email: sessionEmail }, body] = await Promise.all([
+      ensureAppSchema(),
+      getAuthenticatedEmail(req),
+      req.json().catch(() => ({})),
+    ]);
+
     if (!sessionEmail) {
       return NextResponse.json(
         { success: false, error: "Authentication required." },
@@ -245,7 +269,6 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
     const { id, name, phone, address } = body;
 
     if (!id) {
@@ -273,6 +296,9 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    invalidateTenantCache(sessionEmail);
+    setCachedTenantByEmail(sessionEmail, updated[0]);
+
     return NextResponse.json({
       success: true,
       message: "Company profile updated successfully.",
@@ -285,3 +311,4 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
+

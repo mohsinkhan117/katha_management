@@ -162,17 +162,18 @@ export function ExcelLedgerTable({
     debouncedSearch,
   ]);
 
+  const userEmail = user?.primaryEmail || activeTenant?.admin_email || "";
+
   const fetchEntries = useCallback(async () => {
+    if (!userEmail) return;
     setIsLoading(true);
     try {
       const params = buildFilterQueryParams();
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        "x-user-email": userEmail,
+      };
       if (activeTenant?.id) {
         headers["x-tenant-id"] = activeTenant.id;
-      }
-      const email = user?.primaryEmail || activeTenant?.admin_email;
-      if (email) {
-        headers["x-user-email"] = email;
       }
       const res = await fetch(`/api/ledger/entries?${params.toString()}`, {
         headers,
@@ -200,7 +201,7 @@ export function ExcelLedgerTable({
     } finally {
       setIsLoading(false);
     }
-  }, [buildFilterQueryParams, activeTenant?.id, activeTenant?.admin_email, user?.primaryEmail]);
+  }, [buildFilterQueryParams, userEmail]);
 
   useEffect(() => {
     fetchEntries();

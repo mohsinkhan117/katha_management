@@ -19,54 +19,77 @@ async function assertSuperAdminSession(req: NextRequest) {
   return user;
 }
 
-// Ensure companies table exists with 1-month free trial & expiration columns
+const globalForAdminDb = globalThis as unknown as {
+  __adminCompaniesSchemaPromise?: Promise<void> | null;
+  __adminLastExpirySweepMs?: number;
+};
+
+// Ensure companies table exists once per server lifecycle with throttled expiry sweep
 async function ensureCompaniesTable() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS companies (
-      id VARCHAR(64) PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      slug VARCHAR(128) UNIQUE NOT NULL,
-      admin_email VARCHAR(255) NOT NULL,
-      phone VARCHAR(64),
-      address TEXT,
-      plan_tier VARCHAR(32) DEFAULT 'free_trial',
-      max_distributors INT DEFAULT 25,
-      is_active BOOLEAN DEFAULT true,
-      trial_started_at TIMESTAMP WITH TIME ZONE,
-      expires_at TIMESTAMP WITH TIME ZONE,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `;
+  if (!globalForAdminDb.__adminCompaniesSchemaPromise) {
+    globalForAdminDb.__adminCompaniesSchemaPromise = (async () => {
+      try {
+        await sql`
+          CREATE TABLE IF NOT EXISTS companies (
+            id VARCHAR(64) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            slug VARCHAR(128) UNIQUE NOT NULL,
+            admin_email VARCHAR(255) NOT NULL,
+            phone VARCHAR(64),
+            address TEXT,
+            plan_tier VARCHAR(32) DEFAULT 'free_trial',
+            max_distributors INT DEFAULT 25,
+            is_active BOOLEAN DEFAULT true,
+            trial_started_at TIMESTAMP WITH TIME ZONE,
+            expires_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+        `;
 
-  await sql`
-    ALTER TABLE companies
-      ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP WITH TIME ZONE,
-      ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
-  `;
+        await Promise.all([
+          sql`
+            ALTER TABLE companies
+              ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP WITH TIME ZONE,
+              ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE;
+          `.catch(() => {}),
+          sql`CREATE INDEX IF NOT EXISTS idx_companies_admin_email_lower ON companies (LOWER(admin_email));`.catch(() => {}),
+        ]);
+      } catch (err) {
+        globalForAdminDb.__adminCompaniesSchemaPromise = null;
+        throw err;
+      }
+    })();
+  }
 
-  // Automatically deactivate any tenant whose 1-month trial or subscription has expired
-  await sql`
-    UPDATE companies
-    SET is_active = false, updated_at = NOW()
-    WHERE is_active = true
-      AND expires_at IS NOT NULL
-      AND expires_at < NOW();
-  `;
+  await globalForAdminDb.__adminCompaniesSchemaPromise;
+
+  const now = Date.now();
+  if (!globalForAdminDb.__adminLastExpirySweepMs || now - globalForAdminDb.__adminLastExpirySweepMs > 60_000) {
+    globalForAdminDb.__adminLastExpirySweepMs = now;
+    sql`
+      UPDATE companies
+      SET is_active = false, updated_at = NOW()
+      WHERE is_active = true
+        AND expires_at IS NOT NULL
+        AND expires_at < NOW();
+    `.catch(() => {});
+  }
 }
 
 // GET: List all tenant companies (Super Admin only)
 export async function GET(req: NextRequest) {
   try {
-    const user = await assertSuperAdminSession(req);
+    const [user] = await Promise.all([
+      assertSuperAdminSession(req),
+      ensureCompaniesTable(),
+    ]);
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Unauthorized: Super Admin authentication required." },
         { status: 401 }
       );
     }
-
-    await ensureCompaniesTable();
 
     const rows = await sql`
       SELECT 
@@ -101,7 +124,11 @@ export async function GET(req: NextRequest) {
 // POST: Super Admin provisions a new tenant company
 export async function POST(req: NextRequest) {
   try {
-    const user = await assertSuperAdminSession(req);
+    const [user, , body] = await Promise.all([
+      assertSuperAdminSession(req),
+      ensureCompaniesTable(),
+      req.json().catch(() => ({})),
+    ]);
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Unauthorized: Super Admin authentication required." },
@@ -109,9 +136,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await ensureCompaniesTable();
-
-    const body = await req.json();
     const { name, slug, adminEmail, phone, address, planTier, maxDistributors, durationDays } = body;
 
     if (!name || !adminEmail) {
@@ -195,7 +219,11 @@ export async function POST(req: NextRequest) {
 // PATCH: Toggle tenant activation status, extend 1-month trial, or upgrade plan
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await assertSuperAdminSession(req);
+    const [user, , body] = await Promise.all([
+      assertSuperAdminSession(req),
+      ensureCompaniesTable(),
+      req.json().catch(() => ({})),
+    ]);
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Unauthorized: Super Admin authentication required." },
@@ -203,8 +231,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    await ensureCompaniesTable();
-    const { id, isActive, planTier, extendDays } = await req.json();
+    const { id, isActive, planTier, extendDays } = body;
 
     if (!id) {
       return NextResponse.json(
