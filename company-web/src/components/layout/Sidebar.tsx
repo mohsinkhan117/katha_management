@@ -50,7 +50,7 @@ const navItems: NavItem[] = [
     icon: Package,
   },
   {
-    label: "Parties & Khata",
+    label: "Parties / Customers",
     href: "/parties",
     icon: BookOpen,
   },
@@ -67,7 +67,7 @@ const navItems: NavItem[] = [
     icon: MapPin,
   },
   {
-    label: "Commercial Ledger",
+    label: "Party Khata Ledger",
     href: "/ledger",
     icon: FileSpreadsheet,
     badge: "Admin",
@@ -99,11 +99,15 @@ export function Sidebar({
 
   const ordersCount = isCustomTenant && hasAccess
     ? tenantData?.orders?.length || 0
-    : 8;
+    : 0;
 
   const distributorsCount = isCustomTenant && hasAccess
     ? tenantData?.distributors?.length || 0
-    : 12;
+    : 0;
+
+  const partiesCount = isCustomTenant && hasAccess
+    ? tenantData?.parties?.length || 0
+    : 0;
 
   const dynamicNavItems: NavItem[] = [
     {
@@ -124,9 +128,11 @@ export function Sidebar({
       icon: Package,
     },
     {
-      label: "Parties & Khata",
+      label: "Parties / Customers",
       href: "/parties",
       icon: BookOpen,
+      badge: partiesCount > 0 ? `${partiesCount}` : undefined,
+      badgeColor: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/30",
     },
     {
       label: "Distributors",

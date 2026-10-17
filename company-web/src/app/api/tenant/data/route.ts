@@ -442,7 +442,72 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Default: Generate Distributor Invite Token
+    // 5. Create Customer / Party
+    if (action === "create_party") {
+      const { name, ownerName, phone, territory } = body;
+      if (!name || !name.trim()) {
+        return NextResponse.json(
+          { success: false, error: "Party / Customer name is required." },
+          { status: 400 }
+        );
+      }
+
+      const id = `pty_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const rows = await sql`
+        INSERT INTO parties (
+          id,
+          company_id,
+          name,
+          owner_name,
+          phone,
+          territory,
+          balance,
+          created_at
+        ) VALUES (
+          ${id},
+          ${companyId},
+          ${name.trim()},
+          ${ownerName?.trim() || "Proprietor"},
+          ${phone?.trim() || "N/A"},
+          ${territory?.trim() || "General Zone"},
+          0,
+          NOW()
+        ) RETURNING
+          id,
+          name,
+          owner_name as "ownerName",
+          phone,
+          territory,
+          balance,
+          created_at as "createdAt";
+      `;
+
+      return NextResponse.json({
+        success: true,
+        message: "Party / Customer added successfully.",
+        party: rows[0],
+      });
+    }
+
+    // 6. Delete Customer / Party
+    if (action === "delete_party") {
+      const { partyId } = body;
+      if (!partyId) {
+        return NextResponse.json(
+          { success: false, error: "partyId is required." },
+          { status: 400 }
+        );
+      }
+
+      await sql`DELETE FROM parties WHERE id = ${partyId} AND company_id = ${companyId};`;
+
+      return NextResponse.json({
+        success: true,
+        message: "Party / Customer removed.",
+      });
+    }
+
+    // 7. Default: Generate Distributor Invite Token
     const { territoryName, distributorName, phone } = body;
     const part1 = Math.floor(1000 + Math.random() * 9000);
     const part2 = Math.floor(1000 + Math.random() * 9000);

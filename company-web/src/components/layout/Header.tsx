@@ -34,8 +34,8 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Manage company SKU lines, packaging units, and price tiers",
   },
   "/parties": {
-    title: "Parties & Khata Ledger",
-    subtitle: "Centralized credit limits, receivables, and customer ledger books",
+    title: "Parties / Customers",
+    subtitle: "Manage B2B customer parties, proprietors, territories, and contact records",
   },
   "/distributors": {
     title: "Distributor Network & Tokens",

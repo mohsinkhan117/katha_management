@@ -134,6 +134,8 @@ interface TenantContextType {
     }>;
   }) => Promise<{ success: boolean; error?: string }>;
   deleteProduct: (productId: string) => Promise<{ success: boolean; error?: string }>;
+  createParty: (party: { name: string; ownerName?: string; phone?: string; territory?: string }) => Promise<{ success: boolean; error?: string }>;
+  deleteParty: (partyId: string) => Promise<{ success: boolean; error?: string }>;
   issueToken: (tokenData: { territoryName?: string; distributorName?: string; phone?: string }) => Promise<{ success: boolean; token?: any; error?: string }>;
 }
 
@@ -153,6 +155,8 @@ const TenantContext = createContext<TenantContextType>({
   recordCollection: async () => ({ success: false }),
   createProduct: async () => ({ success: false }),
   deleteProduct: async () => ({ success: false }),
+  createParty: async () => ({ success: false }),
+  deleteParty: async () => ({ success: false }),
   issueToken: async () => ({ success: false }),
 });
 
@@ -545,6 +549,78 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Create Party / Customer in Neon DB (Immediate state update)
+  const createParty = async (party: { name: string; ownerName?: string; phone?: string; territory?: string }) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    try {
+      const res = await fetch("/api/tenant/data", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_party",
+          companyId: activeTenant.id,
+          ...party,
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.party) {
+        setTenantData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            parties: [json.party, ...(prev.parties || [])],
+          };
+        });
+        return { success: true };
+      }
+      return { success: false, error: json.error || "Failed to add party" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Delete Party / Customer in Neon DB (Immediate optimistic removal)
+  const deleteParty = async (partyId: string) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    const previousParties = tenantData?.parties;
+    setTenantData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        parties: (prev.parties || []).filter((p) => p.id !== partyId),
+      };
+    });
+
+    try {
+      const res = await fetch("/api/tenant/data", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete_party",
+          companyId: activeTenant.id,
+          partyId,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        return { success: true };
+      }
+      if (previousParties) {
+        setTenantData((prev) => (prev ? { ...prev, parties: previousParties } : prev));
+      }
+      return { success: false, error: json.error || "Failed to remove party" };
+    } catch (err: any) {
+      if (previousParties) {
+        setTenantData((prev) => (prev ? { ...prev, parties: previousParties } : prev));
+      }
+      return { success: false, error: err.message };
+    }
+  };
+
   // Issue Distributor Token in Neon DB (Immediate state update)
   const issueToken = async (tokenData: { territoryName?: string; distributorName?: string; phone?: string }) => {
     if (!activeTenant) return { success: false, error: "No active tenant" };
@@ -594,6 +670,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         recordCollection,
         createProduct,
         deleteProduct,
+        createParty,
+        deleteParty,
         issueToken,
       }}
     >
