@@ -206,10 +206,6 @@ export async function assertAdminAuth(req?: NextRequest) {
     }
   }
 
-  const headerTenantId =
-    req?.headers.get("x-tenant-id")?.trim() ||
-    req?.nextUrl?.searchParams?.get("tenantId")?.trim() ||
-    "";
   const headerUserEmail = req?.headers.get("x-user-email")?.trim()?.toLowerCase() || "";
   const headerUserName = req?.headers.get("x-user-name")?.trim() || "";
 
@@ -222,41 +218,30 @@ export async function assertAdminAuth(req?: NextRequest) {
     .toLowerCase()
     .trim();
 
-  const userEmail = stackEmail || headerUserEmail;
+  const userEmail = stackEmail || (user ? headerUserEmail : "");
+
+  if (!user || !userEmail) {
+    const err: any = new Error("Unauthorized: Please sign in to your company account.");
+    err.statusCode = 401;
+    throw err;
+  }
 
   let tenant: any = null;
 
-  // 1. If we have an authenticated userEmail, check if Super Admin provisioned a tenant or company previously signed up
-  if (userEmail) {
-    const byEmail = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
-      FROM companies
-      WHERE LOWER(admin_email) = ${userEmail}
-      ORDER BY created_at DESC
-      LIMIT 1;
-    `;
-    if (byEmail && byEmail.length > 0) {
-      tenant = byEmail[0];
-    }
+  // 1. Check if Super Admin provisioned a tenant or company previously signed up for this user's email
+  const byEmail = await sql`
+    SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
+    FROM companies
+    WHERE LOWER(admin_email) = ${userEmail}
+    ORDER BY created_at DESC
+    LIMIT 1;
+  `;
+  if (byEmail && byEmail.length > 0) {
+    tenant = byEmail[0];
   }
 
-  // 2. If client passed an explicit active tenant ID
-  if (!tenant && headerTenantId) {
-    const byId = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
-      FROM companies
-      WHERE id = ${headerTenantId} OR slug = ${headerTenantId}
-      LIMIT 1;
-    `;
-    if (byId && byId.length > 0) {
-      if (!userEmail || byId[0].admin_email?.toLowerCase() === userEmail || headerTenantId !== "comp_apex_agro_01") {
-        tenant = byId[0];
-      }
-    }
-  }
-
-  // 3. First-time Company Sign-Up -> Activate 1-Month Free Tier (`free_trial` for 30 days)
-  if (!tenant && userEmail) {
+  // 2. First-time Company Sign-Up -> Activate 1-Month Free Tier (`free_trial` for 30 days)
+  if (!tenant) {
     const cleanPrefix = userEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "") || "tenant";
     const companyId = `comp_${cleanPrefix}_${Date.now().toString(36)}`;
     const companyName =
@@ -286,51 +271,6 @@ export async function assertAdminAuth(req?: NextRequest) {
     tenant = inserted[0];
   }
 
-  // 4. Fallback to headerTenantId or first active company in DB
-  if (!tenant && headerTenantId) {
-    const byId = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
-      FROM companies
-      WHERE id = ${headerTenantId} OR slug = ${headerTenantId}
-      LIMIT 1;
-    `;
-    if (byId && byId.length > 0) {
-      tenant = byId[0];
-    }
-  }
-
-  if (!tenant) {
-    const allCompanies = await sql`
-      SELECT id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at
-      FROM companies
-      WHERE is_active = true
-      ORDER BY created_at ASC
-      LIMIT 1;
-    `;
-    tenant = allCompanies[0];
-  }
-
-  // 5. Ultimate fallback: if companies table is completely empty, seed default company
-  if (!tenant) {
-    const insertedDefault = await sql`
-      INSERT INTO companies (
-        id, name, slug, admin_email, phone, address, plan_tier, is_active
-      ) VALUES (
-        'comp_apex_agro_01',
-        'Apex Agro Chemical Ltd.',
-        'apex-agro',
-        'admin@apexagro.com',
-        '+92 42 35789000',
-        'Plot 42, Industrial Estate, Kot Lakhpat, Lahore',
-        'enterprise',
-        true
-      )
-      ON CONFLICT (id) DO UPDATE SET is_active = true
-      RETURNING id, name, slug, admin_email, plan_tier, is_active, trial_started_at, expires_at;
-    `;
-    tenant = insertedDefault[0];
-  }
-
   // Check if the tenant's 1-month free tier or subscription has expired / been deactivated
   const isExpired =
     tenant.expires_at && new Date(tenant.expires_at).getTime() < Date.now();
@@ -346,11 +286,13 @@ export async function assertAdminAuth(req?: NextRequest) {
 
   await seedDefaultCategories(tenant.id);
 
-  const effectiveEmail = userEmail || tenant.admin_email || "admin@katha.com";
+  const effectiveEmail = userEmail;
   const effectiveName =
     user?.displayName ||
     headerUserName ||
-    (userEmail ? userEmail.split("@")[0] : tenant.name || "Admin");
+    userEmail.split("@")[0] ||
+    tenant.name ||
+    "Admin";
   const effectiveUserId = user?.id || `usr_${effectiveEmail.split("@")[0]}`;
 
   return {

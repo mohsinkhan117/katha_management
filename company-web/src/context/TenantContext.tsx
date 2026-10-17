@@ -156,23 +156,12 @@ const TenantContext = createContext<TenantContextType>({
   issueToken: async () => ({ success: false }),
 });
 
-const DEFAULT_FALLBACK_TENANT: TenantInfo = {
-  id: "comp_apex_agro_01",
-  name: "Apex Agro Chemical Ltd.",
-  slug: "apex-agro",
-  admin_email: "admin@apexagro.com",
-  phone: "+92 42 35789000",
-  address: "Plot 42, Industrial Estate, Kot Lakhpat, Lahore",
-  plan_tier: "enterprise",
-  is_active: true,
-};
-
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const user = useUser();
   const [activeTenant, setActiveTenant] = useState<TenantInfo | null>(null);
   const [availableTenants, setAvailableTenants] = useState<TenantInfo[]>([]);
   const [tenantData, setTenantData] = useState<TenantDataPayload | null>(null);
-  const [hasAccess, setHasAccess] = useState<boolean>(true);
+  const [hasAccess, setHasAccess] = useState<boolean>(false);
   const [isDeactivated, setIsDeactivated] = useState<boolean>(false);
   const [deactivationReason, setDeactivationReason] = useState<string | null>(null);
   const [isCustomTenant, setIsCustomTenant] = useState<boolean>(true);
@@ -181,7 +170,16 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   // Fetch tenant data for active tenant
   const fetchTenantDataFor = useCallback(async (tenant: TenantInfo) => {
     try {
-      const res = await fetch(`/api/tenant/data?companyId=${encodeURIComponent(tenant.id)}&slug=${encodeURIComponent(tenant.slug)}`);
+      const res = await fetch(
+        `/api/tenant/data?companyId=${encodeURIComponent(tenant.id)}&slug=${encodeURIComponent(tenant.slug)}`,
+        {
+          credentials: "include",
+          headers: {
+            "x-tenant-id": tenant.id,
+            "x-user-email": tenant.admin_email || "",
+          },
+        }
+      );
       const json = await res.json();
 
       if (json.success) {
@@ -205,7 +203,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeTenant, fetchTenantDataFor]);
 
-  // Load / Sync Tenant when User state changes
+  // Load / Sync Tenant ONLY when User is authenticated
   useEffect(() => {
     let isCancelled = false;
 
@@ -215,63 +213,53 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         const userEmail = user?.primaryEmail?.toLowerCase();
         const displayName = user?.displayName || (userEmail ? userEmail.split("@")[0] : null);
 
-        if (userEmail) {
-          // Logged-in user:
-          // - If Super Admin provisioned a tenant for this email -> Sign-In binds to that tenant
-          // - If new Sign-Up -> Activates 1-Month Free Tier (expires after 30 days)
-          const syncRes = await fetch("/api/tenant", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: userEmail,
-              name: displayName ? `${displayName.charAt(0).toUpperCase() + displayName.slice(1)} Commercial` : undefined,
-            }),
-          });
-          const syncJson = await syncRes.json();
-
-          if (!isCancelled && syncJson.success && syncJson.company) {
-            const company: TenantInfo = syncJson.company;
-            const deactivated = Boolean(syncJson.isDeactivated || company.is_active === false || company.is_expired);
-            setActiveTenant(company);
-            setAvailableTenants([company]);
-            setIsDeactivated(deactivated);
-            setDeactivationReason(syncJson.deactivationReason || null);
-            setHasAccess(!deactivated);
-            setIsCustomTenant(true);
-            if (!deactivated) {
-              await fetchTenantDataFor(company);
-            }
-            return;
+        if (!userEmail) {
+          // Never auto-login to any pre-created tenant when not signed in
+          if (!isCancelled) {
+            setActiveTenant(null);
+            setAvailableTenants([]);
+            setTenantData(null);
+            setHasAccess(false);
+            setIsDeactivated(false);
+            setDeactivationReason(null);
           }
+          return;
         }
 
-        // Fallback for non-logged in state
-        if (!isCancelled) {
-          const res = await fetch("/api/tenant");
-          const json = await res.json();
-          let companies: TenantInfo[] = [];
-          if (json.success && json.companies && json.companies.length > 0) {
-            companies = json.companies;
-          } else {
-            companies = [DEFAULT_FALLBACK_TENANT];
-          }
+        // Logged-in user:
+        // - If Super Admin provisioned a tenant for this email -> Sign-In binds strictly to that tenant
+        // - If new Sign-Up -> Activates 1-Month Free Tier (expires after 30 days)
+        const syncRes = await fetch("/api/tenant", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: userEmail,
+            name: displayName ? `${displayName.charAt(0).toUpperCase() + displayName.slice(1)} Commercial` : undefined,
+          }),
+        });
+        const syncJson = await syncRes.json();
 
-          const defaultTenant = companies[0] || DEFAULT_FALLBACK_TENANT;
-          setActiveTenant(defaultTenant);
-          setAvailableTenants(companies);
-          setIsDeactivated(false);
-          setDeactivationReason(null);
-          setHasAccess(Boolean(userEmail));
+        if (!isCancelled && syncJson.success && syncJson.company) {
+          const company: TenantInfo = syncJson.company;
+          const deactivated = Boolean(syncJson.isDeactivated || company.is_active === false || company.is_expired);
+          setActiveTenant(company);
+          setAvailableTenants([company]);
+          setIsDeactivated(deactivated);
+          setDeactivationReason(syncJson.deactivationReason || null);
+          setHasAccess(!deactivated);
           setIsCustomTenant(true);
-          await fetchTenantDataFor(defaultTenant);
+          if (!deactivated) {
+            await fetchTenantDataFor(company);
+          }
+          return;
         }
       } catch (err) {
         console.error("Failed to initialize tenant context:", err);
         if (!isCancelled) {
-          setActiveTenant(DEFAULT_FALLBACK_TENANT);
-          setAvailableTenants([DEFAULT_FALLBACK_TENANT]);
-          setHasAccess(Boolean(user?.primaryEmail));
-          setIsCustomTenant(true);
+          setActiveTenant(null);
+          setAvailableTenants([]);
+          setHasAccess(false);
         }
       } finally {
         if (!isCancelled) setIsLoading(false);

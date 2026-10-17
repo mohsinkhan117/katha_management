@@ -1,5 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/neon/db";
+import { stackServerApp } from "@/stack";
+
+async function assertSuperAdminSession(req: NextRequest) {
+  let user: any = null;
+  try {
+    user = await stackServerApp.getUser({ tokenStore: req } as any);
+  } catch (e) {
+    // ignore
+  }
+  if (!user) {
+    try {
+      user = await stackServerApp.getUser();
+    } catch (e) {
+      // ignore
+    }
+  }
+  return user;
+}
 
 // Ensure companies table exists with 1-month free trial & expiration columns
 async function ensureCompaniesTable() {
@@ -37,9 +55,17 @@ async function ensureCompaniesTable() {
   `;
 }
 
-// GET: List all tenant companies
-export async function GET() {
+// GET: List all tenant companies (Super Admin only)
+export async function GET(req: NextRequest) {
   try {
+    const user = await assertSuperAdminSession(req);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Super Admin authentication required." },
+        { status: 401 }
+      );
+    }
+
     await ensureCompaniesTable();
 
     const rows = await sql`
@@ -75,6 +101,14 @@ export async function GET() {
 // POST: Super Admin provisions a new tenant company
 export async function POST(req: NextRequest) {
   try {
+    const user = await assertSuperAdminSession(req);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Super Admin authentication required." },
+        { status: 401 }
+      );
+    }
+
     await ensureCompaniesTable();
 
     const body = await req.json();
@@ -161,6 +195,14 @@ export async function POST(req: NextRequest) {
 // PATCH: Toggle tenant activation status, extend 1-month trial, or upgrade plan
 export async function PATCH(req: NextRequest) {
   try {
+    const user = await assertSuperAdminSession(req);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Super Admin authentication required." },
+        { status: 401 }
+      );
+    }
+
     await ensureCompaniesTable();
     const { id, isActive, planTier, extendDays } = await req.json();
 

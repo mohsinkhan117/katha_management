@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/neon/db";
+import { stackServerApp } from "@/stack";
 
 // Ensure companies table exists in Neon Postgres with 1-month free trial columns
 async function ensureCompaniesTable() {
@@ -55,76 +56,38 @@ function enrichCompanyStatus(company: any) {
   };
 }
 
-// GET: Retrieve all active tenants, or get by slug, or get by email
+async function getAuthenticatedEmail(req: NextRequest): Promise<{ user: any; email: string | null }> {
+  let user: any = null;
+  try {
+    user = await stackServerApp.getUser({ tokenStore: req } as any);
+  } catch (e) {
+    // ignore
+  }
+  if (!user) {
+    try {
+      user = await stackServerApp.getUser();
+    } catch (e) {
+      // ignore
+    }
+  }
+  const email = (user?.primaryEmail || user?.emails?.[0] || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+  return { user, email: email || null };
+}
+
+// GET: Retrieve ONLY the authenticated user's own tenant
 export async function GET(req: NextRequest) {
   try {
     await ensureCompaniesTable();
 
-    const { searchParams } = new URL(req.url);
-    const slug = searchParams.get("slug");
-    const email = searchParams.get("email");
-
-    if (slug) {
-      const rows = await sql`
-        SELECT 
-          id,
-          name,
-          slug,
-          admin_email,
-          phone,
-          address,
-          plan_tier,
-          max_distributors,
-          is_active,
-          trial_started_at,
-          expires_at,
-          created_at,
-          updated_at
-        FROM companies
-        WHERE slug = ${slug}
-        LIMIT 1;
-      `;
-
-      if (rows && rows.length > 0) {
-        return NextResponse.json({
-          success: true,
-          company: enrichCompanyStatus(rows[0]),
-        });
-      }
+    const { email: sessionEmail } = await getAuthenticatedEmail(req);
+    if (!sessionEmail) {
       return NextResponse.json(
-        { success: false, error: "Tenant not found or inactive." },
-        { status: 404 }
+        { success: false, error: "Authentication required. Please sign in." },
+        { status: 401 }
       );
-    }
-
-    if (email) {
-      const cleanEmail = email.trim().toLowerCase();
-      const rows = await sql`
-        SELECT 
-          id,
-          name,
-          slug,
-          admin_email,
-          phone,
-          address,
-          plan_tier,
-          max_distributors,
-          is_active,
-          trial_started_at,
-          expires_at,
-          created_at,
-          updated_at
-        FROM companies
-        WHERE LOWER(admin_email) = ${cleanEmail}
-        LIMIT 1;
-      `;
-
-      if (rows && rows.length > 0) {
-        return NextResponse.json({
-          success: true,
-          company: enrichCompanyStatus(rows[0]),
-        });
-      }
     }
 
     const rows = await sql`
@@ -143,13 +106,16 @@ export async function GET(req: NextRequest) {
         created_at,
         updated_at
       FROM companies
-      WHERE is_active = true
-      ORDER BY name ASC;
+      WHERE LOWER(admin_email) = ${sessionEmail}
+      LIMIT 1;
     `;
+
+    const company = rows.length > 0 ? enrichCompanyStatus(rows[0]) : null;
 
     return NextResponse.json({
       success: true,
-      companies: rows.map(enrichCompanyStatus),
+      company,
+      companies: company ? [company] : [],
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -165,22 +131,23 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await ensureCompaniesTable();
+    const { user, email: sessionEmail } = await getAuthenticatedEmail(req);
     const body = await req.json();
-    const { email, name, phone, address } = body;
+    const { email: bodyEmail, name, phone, address } = body;
 
-    if (!email) {
+    const cleanEmail = (sessionEmail || bodyEmail || "").trim().toLowerCase();
+
+    if (!sessionEmail || !cleanEmail) {
       return NextResponse.json(
-        { success: false, error: "User email is required to sync tenant" },
-        { status: 400 }
+        { success: false, error: "Authentication required to access or create a tenant." },
+        { status: 401 }
       );
     }
-
-    const cleanEmail = email.trim().toLowerCase();
 
     // 1. Check if Super Admin provisioned a tenant or company previously signed up
     const existing = await sql`
       SELECT * FROM companies
-      WHERE LOWER(admin_email) = ${cleanEmail}
+      WHERE LOWER(admin_email) = ${sessionEmail}
       LIMIT 1;
     `;
 
@@ -200,10 +167,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. First-time Company Sign-Up -> Activate 1-Month Free Tier (30 days)
+    const displayName = user?.displayName || name;
     const companyName =
-      name && name.trim().length > 0
-        ? name.trim()
-        : `${cleanEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, " ").trim()} Commercial`;
+      displayName && displayName.trim().length > 0
+        ? displayName.trim()
+        : `${sessionEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, " ").trim()} Commercial`;
 
     let baseSlug = companyName
       .toLowerCase()
@@ -236,7 +204,7 @@ export async function POST(req: NextRequest) {
         ${companyId},
         ${companyName},
         ${finalSlug},
-        ${cleanEmail},
+        ${sessionEmail},
         ${phone || "+92 300 0000000"},
         ${address || "Headquarters Commercial Zone"},
         'free_trial',
@@ -265,12 +233,20 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH: Update tenant company profile settings
+// PATCH: Update tenant company profile settings (only for the signed-in owner)
 export async function PATCH(req: NextRequest) {
   try {
     await ensureCompaniesTable();
+    const { email: sessionEmail } = await getAuthenticatedEmail(req);
+    if (!sessionEmail) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
-    const { id, name, phone, address, adminEmail } = body;
+    const { id, name, phone, address } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -285,16 +261,15 @@ export async function PATCH(req: NextRequest) {
         name = COALESCE(${name || null}, name),
         phone = COALESCE(${phone || null}, phone),
         address = COALESCE(${address || null}, address),
-        admin_email = COALESCE(${adminEmail ? adminEmail.trim().toLowerCase() : null}, admin_email),
         updated_at = NOW()
-      WHERE id = ${id}
+      WHERE id = ${id} AND LOWER(admin_email) = ${sessionEmail}
       RETURNING *;
     `;
 
     if (!updated || updated.length === 0) {
       return NextResponse.json(
-        { success: false, error: "Company not found." },
-        { status: 404 }
+        { success: false, error: "Company not found or unauthorized." },
+        { status: 403 }
       );
     }
 

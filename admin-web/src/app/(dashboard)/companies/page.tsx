@@ -58,57 +58,18 @@ export default function AdminCompaniesPage() {
   const fetchCompanies = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/admin/api/companies");
+      const res = await fetch("/admin/api/companies", {
+        credentials: "include",
+      });
       const json = await res.json();
       if (json.success) {
         setCompanies(json.companies || []);
       } else {
-        // Fallback demo companies if table just initialized
-        setCompanies([
-          {
-            id: "comp_apex_agro_01",
-            name: "Apex Agro Chemical Ltd.",
-            slug: "apex-agro",
-            admin_email: "admin@apexagro.com",
-            phone: "+92 42 35789000",
-            address: "Plot 42, Industrial Estate, Kot Lakhpat, Lahore",
-            plan_tier: "enterprise",
-            max_distributors: 50,
-            is_active: true,
-            created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-          },
-          {
-            id: "comp_crescent_feed_02",
-            name: "Crescent Cattle Feed & Grains",
-            slug: "crescent-feed",
-            admin_email: "operations@crescentfeed.pk",
-            phone: "+92 41 8765432",
-            address: "Sargodha Road, Faisalabad",
-            plan_tier: "free_trial",
-            max_distributors: 5,
-            is_active: true,
-            trial_started_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-            expires_at: new Date(Date.now() + 86400000 * 20).toISOString(),
-            created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-          },
-          {
-            id: "comp_indus_fertilizer_03",
-            name: "Indus Valley Fertilizer Corp",
-            slug: "indus-fertilizer",
-            admin_email: "mgmt@indusfert.com",
-            phone: "+92 61 4567890",
-            address: "Khanewal Road, Multan",
-            plan_tier: "free_trial",
-            max_distributors: 5,
-            is_active: false,
-            trial_started_at: new Date(Date.now() - 86400000 * 35).toISOString(),
-            expires_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-            created_at: new Date(Date.now() - 86400000 * 35).toISOString(),
-          },
-        ]);
+        setCompanies([]);
       }
     } catch (err: any) {
       console.error(err);
+      setCompanies([]);
     } finally {
       setIsLoading(false);
     }

@@ -1,5 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/neon/db";
+import { stackServerApp } from "@/stack";
+
+async function getAuthenticatedUserEmail(req: NextRequest): Promise<string | null> {
+  let user: any = null;
+  try {
+    user = await stackServerApp.getUser({ tokenStore: req } as any);
+  } catch (e) {
+    // ignore
+  }
+  if (!user) {
+    try {
+      user = await stackServerApp.getUser();
+    } catch (e) {
+      // ignore
+    }
+  }
+  const email = (user?.primaryEmail || user?.emails?.[0] || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+  return email || null;
+}
 
 // Ensure schema exists in Neon Postgres
 async function ensureTables() {
@@ -11,9 +33,11 @@ async function ensureTables() {
       admin_email VARCHAR(255) NOT NULL,
       phone VARCHAR(64),
       address TEXT,
-      plan_tier VARCHAR(32) DEFAULT 'standard',
+      plan_tier VARCHAR(32) DEFAULT 'free_trial',
       max_distributors INT DEFAULT 25,
       is_active BOOLEAN DEFAULT true,
+      trial_started_at TIMESTAMP WITH TIME ZONE,
+      expires_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
@@ -122,26 +146,21 @@ export async function GET(req: NextRequest) {
   try {
     await ensureTables();
 
-    const { searchParams } = new URL(req.url);
-    const companyId = searchParams.get("companyId");
-    const slug = searchParams.get("slug");
-
-    if (!companyId && !slug) {
+    const sessionEmail = await getAuthenticatedUserEmail(req);
+    if (!sessionEmail) {
       return NextResponse.json(
-        { success: false, error: "companyId or slug is required" },
-        { status: 400 }
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
       );
     }
 
-    // Resolve company
-    let company: any = null;
-    if (companyId) {
-      const compRows = await sql`SELECT * FROM companies WHERE id = ${companyId} LIMIT 1;`;
-      if (compRows.length > 0) company = compRows[0];
-    } else if (slug) {
-      const compRows = await sql`SELECT * FROM companies WHERE slug = ${slug} LIMIT 1;`;
-      if (compRows.length > 0) company = compRows[0];
-    }
+    // Resolve company strictly owned by the signed-in user's email
+    const compRows = await sql`
+      SELECT * FROM companies
+      WHERE LOWER(admin_email) = ${sessionEmail}
+      LIMIT 1;
+    `;
+    const company = compRows.length > 0 ? compRows[0] : null;
 
     if (!company) {
       return NextResponse.json({
@@ -298,15 +317,43 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await ensureTables();
-    const body = await req.json();
-    const { action, companyId } = body;
-
-    if (!companyId) {
+    const sessionEmail = await getAuthenticatedUserEmail(req);
+    if (!sessionEmail) {
       return NextResponse.json(
-        { success: false, error: "companyId is required" },
-        { status: 400 }
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
       );
     }
+
+    const compRows = await sql`
+      SELECT id, is_active, expires_at FROM companies
+      WHERE LOWER(admin_email) = ${sessionEmail}
+      LIMIT 1;
+    `;
+    if (compRows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "No tenant company found for your account." },
+        { status: 403 }
+      );
+    }
+
+    const company = compRows[0];
+    const isExpired = company.expires_at && new Date(company.expires_at).getTime() < Date.now();
+    if (company.is_active === false || isExpired) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: isExpired
+            ? "Your 1-month Free Tier has expired and your company account is deactivated."
+            : "Your company tenant account is deactivated.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { action } = body;
+    const companyId = company.id as string;
 
     // 1. Create a real B2B Order
     if (action === "create_order") {
