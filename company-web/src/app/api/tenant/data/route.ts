@@ -58,9 +58,47 @@ async function ensureTables() {
       name VARCHAR(255) NOT NULL,
       sku VARCHAR(64),
       category VARCHAR(128),
+      unit VARCHAR(64) DEFAULT 'unit',
+      description TEXT,
+      image_url TEXT,
+      retail_price NUMERIC(12, 2) DEFAULT 0,
       unit_price NUMERIC(12, 2) DEFAULT 0,
+      discount_percentage NUMERIC(5, 2) DEFAULT 0,
+      final_price NUMERIC(12, 2) DEFAULT 0,
+      cost_price NUMERIC(12, 2),
       stock_quantity INT DEFAULT 0,
+      status VARCHAR(32) DEFAULT 'inStock',
       is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `;
+
+  // Safely ensure all columns exist if table was created in an earlier migration
+  try {
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS unit VARCHAR(64) DEFAULT 'unit';`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS retail_price NUMERIC(12, 2) DEFAULT 0;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_percentage NUMERIC(5, 2) DEFAULT 0;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS final_price NUMERIC(12, 2) DEFAULT 0;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price NUMERIC(12, 2);`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'inStock';`;
+  } catch (err: any) {
+    // Ignore if column already exists
+  }
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_sizes (
+      id VARCHAR(64) PRIMARY KEY,
+      product_id VARCHAR(64) NOT NULL,
+      company_id VARCHAR(64) NOT NULL,
+      label VARCHAR(128) NOT NULL,
+      price NUMERIC(12, 2) NOT NULL,
+      discount_percentage NUMERIC(5, 2) DEFAULT 0,
+      final_price NUMERIC(12, 2) NOT NULL,
+      cost_price NUMERIC(12, 2),
+      sort_order INT DEFAULT 0,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `;
@@ -146,21 +184,49 @@ export async function GET(req: NextRequest) {
       ORDER BY created_at DESC;
     `;
 
-    // Fetch products for THIS tenant
-    const products = await sql`
+    // Fetch products with their sizes for THIS tenant
+    const rawProducts = await sql`
       SELECT 
         id,
         name,
         sku,
         category,
-        unit_price as "unitPrice",
-        stock_quantity as "stockQuantity",
+        COALESCE(unit, 'unit') as unit,
+        description,
+        image_url as "imageUrl",
+        COALESCE(retail_price, unit_price, 0) as "retailPrice",
+        COALESCE(unit_price, retail_price, 0) as "unitPrice",
+        COALESCE(discount_percentage, 0) as "discountPercentage",
+        COALESCE(final_price, unit_price, 0) as "finalPrice",
+        cost_price as "costPrice",
+        COALESCE(stock_quantity, 0) as "stockQuantity",
+        COALESCE(status, 'inStock') as status,
         is_active as "isActive",
         created_at as "createdAt"
       FROM products
       WHERE company_id = ${company.id}
       ORDER BY created_at DESC;
     `;
+
+    const rawSizes = await sql`
+      SELECT 
+        id,
+        product_id as "productId",
+        label,
+        price,
+        COALESCE(discount_percentage, 0) as "discountPercentage",
+        final_price as "finalPrice",
+        cost_price as "costPrice",
+        COALESCE(sort_order, 0) as "sortOrder"
+      FROM product_sizes
+      WHERE company_id = ${company.id}
+      ORDER BY sort_order ASC, price ASC;
+    `;
+
+    const products = rawProducts.map((p: any) => ({
+      ...p,
+      sizes: rawSizes.filter((s: any) => s.productId === p.id),
+    }));
 
     // Fetch parties for THIS tenant
     const parties = await sql`
@@ -228,7 +294,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/tenant/data - Create orders, tokens, products, or record collections
+// POST /api/tenant/data - Create orders, tokens, products with sizes, or record collections
 export async function POST(req: NextRequest) {
   try {
     await ensureTables();
@@ -312,7 +378,6 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // If no specific order selected, find an order with outstanding balance or create collection order record
       const rows = await sql`
         INSERT INTO orders (
           id,
@@ -346,18 +411,45 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. Add Product SKU
+    // 3. Add Product with optional Sizes / Variants
     if (action === "create_product") {
-      const { name, sku, category, unitPrice, stockQuantity } = body;
-      if (!name || !unitPrice) {
+      const {
+        name,
+        sku,
+        category,
+        unit,
+        description,
+        imageUrl,
+        retailPrice,
+        unitPrice,
+        discountPercentage,
+        finalPrice,
+        costPrice,
+        stockQuantity,
+        status,
+        sizes,
+      } = body;
+
+      if (!name) {
         return NextResponse.json(
-          { success: false, error: "Product name and Unit Price are required" },
+          { success: false, error: "Product name is required" },
           { status: 400 }
         );
       }
 
       const id = `prod_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-      const prodSku = sku || `SKU-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+      const prodSku = sku && sku.trim().length > 0
+        ? sku.trim().toUpperCase()
+        : `SKU-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+
+      const baseRetail = Number(retailPrice ?? unitPrice ?? 0);
+      const baseDiscount = Number(discountPercentage ?? 0);
+      const calculatedFinal = finalPrice !== undefined && finalPrice !== null
+        ? Number(finalPrice)
+        : Number((baseRetail * (1 - baseDiscount / 100)).toFixed(2));
+      const baseCost = costPrice !== undefined && costPrice !== null && costPrice !== ""
+        ? Number(costPrice)
+        : null;
 
       const rows = await sql`
         INSERT INTO products (
@@ -366,29 +458,106 @@ export async function POST(req: NextRequest) {
           name,
           sku,
           category,
+          unit,
+          description,
+          image_url,
+          retail_price,
           unit_price,
+          discount_percentage,
+          final_price,
+          cost_price,
           stock_quantity,
-          is_active
+          status,
+          is_active,
+          created_at
         ) VALUES (
           ${id},
           ${companyId},
-          ${name},
+          ${name.trim()},
           ${prodSku},
-          ${category || "General SKU"},
-          ${Number(unitPrice)},
+          ${category || "General"},
+          ${unit || "unit"},
+          ${description || null},
+          ${imageUrl || null},
+          ${baseRetail},
+          ${baseRetail},
+          ${baseDiscount},
+          ${calculatedFinal},
+          ${baseCost},
           ${Number(stockQuantity || 0)},
-          true
+          ${status || "inStock"},
+          true,
+          NOW()
         ) RETURNING *;
       `;
 
+      // Insert any size variants if provided
+      if (Array.isArray(sizes) && sizes.length > 0) {
+        for (let i = 0; i < sizes.length; i++) {
+          const s = sizes[i];
+          if (!s.label) continue;
+          const sizeId = `size_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}_${i}`;
+          const sPrice = Number(s.price || 0);
+          const sDiscount = Number(s.discountPercentage || 0);
+          const sFinal = s.finalPrice !== undefined && s.finalPrice !== null
+            ? Number(s.finalPrice)
+            : Number((sPrice * (1 - sDiscount / 100)).toFixed(2));
+          const sCost = s.costPrice !== undefined && s.costPrice !== null && s.costPrice !== ""
+            ? Number(s.costPrice)
+            : null;
+
+          await sql`
+            INSERT INTO product_sizes (
+              id,
+              product_id,
+              company_id,
+              label,
+              price,
+              discount_percentage,
+              final_price,
+              cost_price,
+              sort_order,
+              created_at
+            ) VALUES (
+              ${sizeId},
+              ${id},
+              ${companyId},
+              ${s.label.trim()},
+              ${sPrice},
+              ${sDiscount},
+              ${sFinal},
+              ${sCost},
+              ${i},
+              NOW()
+            );
+          `;
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        message: "Product SKU added to catalog successfully.",
+        message: "Product and size variants added to catalog successfully.",
         product: rows[0],
       });
     }
 
-    // 4. Default: Generate Distributor Invite Token
+    // 4. Delete Product and its sizes
+    if (action === "delete_product") {
+      const { productId } = body;
+      if (!productId) {
+        return NextResponse.json({ success: false, error: "productId is required" }, { status: 400 });
+      }
+
+      await sql`DELETE FROM product_sizes WHERE product_id = ${productId} AND company_id = ${companyId};`;
+      await sql`DELETE FROM products WHERE id = ${productId} AND company_id = ${companyId};`;
+
+      return NextResponse.json({
+        success: true,
+        message: "Product removed from catalog.",
+      });
+    }
+
+    // 5. Default: Generate Distributor Invite Token
     const { territoryName, distributorName, phone } = body;
     const part1 = Math.floor(1000 + Math.random() * 9000);
     const part2 = Math.floor(1000 + Math.random() * 9000);

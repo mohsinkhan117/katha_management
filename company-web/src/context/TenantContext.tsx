@@ -14,6 +14,37 @@ export interface TenantInfo {
   max_distributors?: number;
 }
 
+export interface ProductSize {
+  id?: string;
+  productId?: string;
+  label: string;
+  price: number;
+  discountPercentage?: number;
+  finalPrice: number;
+  costPrice?: number;
+  sortOrder?: number;
+}
+
+export interface ProductItem {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  unit?: string;
+  description?: string;
+  imageUrl?: string;
+  retailPrice: number;
+  unitPrice: number;
+  discountPercentage: number;
+  finalPrice: number;
+  costPrice?: number;
+  stockQuantity: number;
+  status: "inStock" | "outOfStock";
+  isActive: boolean;
+  sizes?: ProductSize[];
+  createdAt?: string;
+}
+
 export interface TenantDataPayload {
   metrics: {
     totalOrders: number;
@@ -49,16 +80,7 @@ export interface TenantDataPayload {
     status: string;
     date: string;
   }>;
-  products?: Array<{
-    id: string;
-    name: string;
-    sku: string;
-    category: string;
-    unitPrice: number;
-    stockQuantity: number;
-    isActive: boolean;
-    createdAt?: string;
-  }>;
+  products?: ProductItem[];
   parties?: Array<{
     id: string;
     name: string;
@@ -82,7 +104,29 @@ interface TenantContextType {
   updateTenantProfile: (data: { name?: string; phone?: string; address?: string; adminEmail?: string }) => Promise<{ success: boolean; error?: string }>;
   createOrder: (order: { partyName: string; distributorName?: string; totalAmount: number; paidAmount?: number; status?: string; itemsCount?: number }) => Promise<{ success: boolean; error?: string }>;
   recordCollection: (collection: { orderId?: string; partyName?: string; amount: number }) => Promise<{ success: boolean; error?: string }>;
-  createProduct: (product: { name: string; sku?: string; category?: string; unitPrice: number; stockQuantity?: number }) => Promise<{ success: boolean; error?: string }>;
+  createProduct: (product: {
+    name: string;
+    sku?: string;
+    category?: string;
+    unit?: string;
+    description?: string;
+    imageUrl?: string;
+    retailPrice?: number;
+    unitPrice?: number;
+    discountPercentage?: number;
+    finalPrice?: number;
+    costPrice?: number;
+    stockQuantity?: number;
+    status?: "inStock" | "outOfStock";
+    sizes?: Array<{
+      label: string;
+      price: number;
+      discountPercentage?: number;
+      finalPrice?: number;
+      costPrice?: number;
+    }>;
+  }) => Promise<{ success: boolean; error?: string }>;
+  deleteProduct: (productId: string) => Promise<{ success: boolean; error?: string }>;
   issueToken: (tokenData: { territoryName?: string; distributorName?: string; phone?: string }) => Promise<{ success: boolean; token?: any; error?: string }>;
 }
 
@@ -99,6 +143,7 @@ const TenantContext = createContext<TenantContextType>({
   createOrder: async () => ({ success: false }),
   recordCollection: async () => ({ success: false }),
   createProduct: async () => ({ success: false }),
+  deleteProduct: async () => ({ success: false }),
   issueToken: async () => ({ success: false }),
 });
 
@@ -310,8 +355,29 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Create Product SKU in Neon DB
-  const createProduct = async (product: { name: string; sku?: string; category?: string; unitPrice: number; stockQuantity?: number }) => {
+  // Create Product SKU with Sizes in Neon DB
+  const createProduct = async (product: {
+    name: string;
+    sku?: string;
+    category?: string;
+    unit?: string;
+    description?: string;
+    imageUrl?: string;
+    retailPrice?: number;
+    unitPrice?: number;
+    discountPercentage?: number;
+    finalPrice?: number;
+    costPrice?: number;
+    stockQuantity?: number;
+    status?: "inStock" | "outOfStock";
+    sizes?: Array<{
+      label: string;
+      price: number;
+      discountPercentage?: number;
+      finalPrice?: number;
+      costPrice?: number;
+    }>;
+  }) => {
     if (!activeTenant) return { success: false, error: "No active tenant" };
 
     try {
@@ -330,6 +396,31 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         return { success: true };
       }
       return { success: false, error: json.error || "Failed to add product" };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Delete Product and associated sizes in Neon DB
+  const deleteProduct = async (productId: string) => {
+    if (!activeTenant) return { success: false, error: "No active tenant" };
+
+    try {
+      const res = await fetch("/api/tenant/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete_product",
+          companyId: activeTenant.id,
+          productId,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await refreshTenantData();
+        return { success: true };
+      }
+      return { success: false, error: json.error || "Failed to delete product" };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -374,6 +465,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         createOrder,
         recordCollection,
         createProduct,
+        deleteProduct,
         issueToken,
       }}
     >
