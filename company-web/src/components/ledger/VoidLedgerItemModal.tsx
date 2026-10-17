@@ -28,7 +28,7 @@ export function VoidLedgerItemModal({
       style: "currency",
       currency: "PKR",
       maximumFractionDigits: 2,
-    }).format(minor / 100);
+    }).format((minor || 0) / 100);
   };
 
   const handleVoid = async (e: React.FormEvent) => {
@@ -65,103 +65,98 @@ export function VoidLedgerItemModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden text-slate-100">
+      <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden text-slate-900">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-red-950/20">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-rose-50/60">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+            <div className="p-2 rounded-xl bg-rose-100 border border-rose-200 text-rose-600">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Void Ledger Entry</h2>
-              <p className="text-xs text-slate-400">Permanent audit recording</p>
+              <h2 className="text-base font-bold text-slate-900">Void Khata Entry</h2>
+              <p className="text-xs text-slate-500">Exclude mistaken entry from expense totals</p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <form onSubmit={handleVoid} className="p-6 space-y-5">
+        <form onSubmit={handleVoid} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 flex items-start gap-2">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Entry Summary Box */}
-          <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-4 space-y-2 text-sm">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Title:</span>
-              <span className="font-medium text-white">{entry.title}</span>
+              <span className="text-slate-500">Item Brought:</span>
+              <span className="font-bold text-slate-900">{entry.title}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Amount:</span>
-              <span className={`font-mono font-semibold ${entry.type === "income" ? "text-emerald-400" : "text-rose-400"}`}>
-                {entry.type === "income" ? "+" : "-"}{formatCurrency(entry.amount_minor)}
+              <span className="text-slate-500">Quantity:</span>
+              <span className="font-mono font-bold text-blue-700">
+                {entry.quantity || 1} {entry.unit || "pcs"}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Category:</span>
-              <span className="text-slate-200">{entry.category_name}</span>
+              <span className="text-slate-500">Total Cost Price:</span>
+              <span className="font-mono font-extrabold text-slate-900">
+                {formatCurrency(entry.amount_minor)}
+              </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Date & Time:</span>
-              <span className="text-slate-300 font-mono text-xs">
+              <span className="text-slate-500">Category:</span>
+              <span className="font-semibold text-slate-700">{entry.category_name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Date & Time:</span>
+              <span className="text-slate-600 font-mono">
                 {new Date(entry.occurred_at).toLocaleString()}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Added By:</span>
-              <span className="text-slate-300">{entry.added_by_name || "Admin"}</span>
-            </div>
-          </div>
-
-          {/* Warning Note */}
-          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 leading-relaxed">
-            <span className="font-semibold text-amber-200">Notice:</span> Ledger records are append-only.
-            Voiding will not delete the record; it will be marked as voided with an audit timestamp and reason,
-            and excluded from all financial calculations and balances.
           </div>
 
           {/* Required Reason Input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Reason for Voiding <span className="text-red-400">*</span>
+            <label className="block text-xs font-bold text-slate-700">
+              Reason for Voiding <span className="text-rose-600">*</span>
             </label>
             <textarea
               required
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Duplicate entry recorded by mistake, wrong amount entered..."
-              className="w-full px-3 py-2 bg-slate-950/80 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
+              placeholder="e.g., Duplicate item entry, wrong quantity or cost price entered..."
+              className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 resize-none"
             />
             <p className="text-[11px] text-slate-400">
-              Minimum 3 characters. This explanation will be permanently recorded in the audit trail.
+              Minimum 3 characters. Voided items are excluded from daily, weekly, monthly, and yearly expense totals.
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 rounded-lg transition"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-xl transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || reason.trim().length < 3}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-lg shadow-red-600/20 transition flex items-center gap-2"
+              className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-md shadow-rose-600/20 transition flex items-center gap-1.5"
             >
               {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>Confirm & Void Entry</span>
@@ -172,4 +167,3 @@ export function VoidLedgerItemModal({
     </div>
   );
 }
-

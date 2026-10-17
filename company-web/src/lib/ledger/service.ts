@@ -19,7 +19,11 @@ export interface LedgerEntry {
   title: string;
   category_id: string;
   category_name?: string;
+  quantity: number;
+  unit: string;
+  unit_cost_minor: number;
   amount_minor: number;
+  vendor_name: string | null;
   currency: string;
   payment_method: "cash" | "card" | "online" | "other" | null;
   occurred_at: string;
@@ -32,7 +36,17 @@ export interface LedgerEntry {
   void_reason: string | null;
 }
 
-// 1. Ensure Tables & Indexes Exist in Neon PostgreSQL
+export interface AggregatedItemSummary {
+  itemName: string;
+  unit: string;
+  categoryName: string;
+  totalQuantity: number;
+  totalCostMinor: number;
+  avgUnitCostMinor: number;
+  purchaseCount: number;
+}
+
+// 1. Ensure Tables, Columns & Indexes Exist in Neon PostgreSQL
 export async function ensureLedgerSchema() {
   await sql`
     CREATE TABLE IF NOT EXISTS ledger_categories (
@@ -50,10 +64,14 @@ export async function ensureLedgerSchema() {
     CREATE TABLE IF NOT EXISTS ledger_entries (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       tenant_id VARCHAR(64) NOT NULL,
-      type VARCHAR(16) NOT NULL CHECK (type IN ('income', 'expense')),
+      type VARCHAR(16) NOT NULL DEFAULT 'expense' CHECK (type IN ('income', 'expense')),
       title VARCHAR(255) NOT NULL,
       category_id UUID NOT NULL REFERENCES ledger_categories(id),
+      quantity NUMERIC(12, 2) NOT NULL DEFAULT 1,
+      unit VARCHAR(32) NOT NULL DEFAULT 'pcs',
+      unit_cost_minor BIGINT,
       amount_minor BIGINT NOT NULL CHECK (amount_minor > 0),
+      vendor_name VARCHAR(255),
       currency CHAR(3) NOT NULL DEFAULT 'PKR',
       payment_method VARCHAR(16) CHECK (payment_method IN ('cash', 'card', 'online', 'other')),
       occurred_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -68,6 +86,15 @@ export async function ensureLedgerSchema() {
   `;
 
   try {
+    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS quantity NUMERIC(12, 2) NOT NULL DEFAULT 1;`;
+    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS unit VARCHAR(32) NOT NULL DEFAULT 'pcs';`;
+    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS unit_cost_minor BIGINT;`;
+    await sql`ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS vendor_name VARCHAR(255);`;
+  } catch (err) {
+    // Columns already exist
+  }
+
+  try {
     await sql`CREATE INDEX IF NOT EXISTS idx_ledger_categories_tenant ON ledger_categories (tenant_id, type);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant_occurred ON ledger_entries (tenant_id, occurred_at DESC);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant_category ON ledger_entries (tenant_id, category_id);`;
@@ -78,23 +105,28 @@ export async function ensureLedgerSchema() {
   }
 }
 
-// 2. Seed Shop Default Categories per Tenant
+// 2. Seed Default Categories per Tenant (Hotel / Party Purchase & Expense Categories)
 export async function seedDefaultCategories(tenantId: string) {
   const defaultCategories: Array<{ name: string; type: "income" | "expense" }> = [
-    // Income
+    // Hotel / Party Purchase & Expense Categories
+    { name: "Meat & Poultry", type: "expense" },
+    { name: "Vegetables & Fruits", type: "expense" },
+    { name: "Groceries & Spices", type: "expense" },
+    { name: "Dairy & Bakery", type: "expense" },
+    { name: "Beverages & Drinks", type: "expense" },
+    { name: "Kitchen Supplies & Gas", type: "expense" },
+    { name: "Stock Purchase", type: "expense" },
+    { name: "Utilities", type: "expense" },
+    { name: "Wages", type: "expense" },
+    { name: "Rent", type: "expense" },
+    { name: "Transport", type: "expense" },
+    { name: "Maintenance", type: "expense" },
+    { name: "Other", type: "expense" },
+    // Income Categories (if needed)
     { name: "Sales - Cash", type: "income" },
     { name: "Sales - Card", type: "income" },
     { name: "Sales - Online", type: "income" },
     { name: "Other Income", type: "income" },
-    // Expense
-    { name: "Stock Purchase", type: "expense" },
-    { name: "Rent", type: "expense" },
-    { name: "Wages", type: "expense" },
-    { name: "Utilities", type: "expense" },
-    { name: "Transport", type: "expense" },
-    { name: "Maintenance", type: "expense" },
-    { name: "Refunds", type: "expense" },
-    { name: "Other", type: "expense" },
   ];
 
   for (const cat of defaultCategories) {
@@ -160,10 +192,8 @@ export async function assertAdminAuth(req?: NextRequest) {
       const allCompanies = await sql`SELECT id, name, slug, admin_email FROM companies WHERE is_active = true LIMIT 1;`;
       tenant = allCompanies[0];
     } else {
-      // Check if user has an admin role in server metadata
       const hasAdminRole = user.serverMetadata?.role === "admin";
       if (!hasAdminRole) {
-        // Auto-provision tenant for logged-in user so they have their own company
         const companyId = `comp_${userEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "")}_${Date.now().toString(36)}`;
         const companyName = user.displayName || `${userEmail.split("@")[0]} Commercial`;
         const companySlug = `${userEmail.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-")}-${Date.now().toString(36).slice(-4)}`;
@@ -187,7 +217,6 @@ export async function assertAdminAuth(req?: NextRequest) {
     throw error;
   }
 
-  // Ensure default categories are seeded for this tenant
   await seedDefaultCategories(tenant.id);
 
   return {
@@ -198,7 +227,7 @@ export async function assertAdminAuth(req?: NextRequest) {
     tenantId: tenant.id as string,
     tenantName: tenant.name as string,
     currency: "PKR",
-    timezone: "Asia/Karachi", // Default tenant timezone
+    timezone: "Asia/Karachi",
   };
 }
 
@@ -217,7 +246,7 @@ export async function getLedgerCategories(tenantId: string) {
 }
 
 // 5. Create Custom Ledger Category
-export async function createLedgerCategory(tenantId: string, name: string, type: "income" | "expense") {
+export async function createLedgerCategory(tenantId: string, name: string, type: "income" | "expense" = "expense") {
   await ensureLedgerSchema();
 
   const rows = await sql`
@@ -238,7 +267,7 @@ export async function createLedgerCategory(tenantId: string, name: string, type:
   return rows[0] as unknown as LedgerCategory;
 }
 
-// 6. Create Ledger Entry
+// 6. Create Ledger Entry (Item Brought / Expense)
 export async function createLedgerEntry(
   tenantId: string,
   userId: string,
@@ -247,7 +276,6 @@ export async function createLedgerEntry(
 ) {
   await ensureLedgerSchema();
 
-  // Validate category belongs to this tenant or is valid
   const catRows = await sql`
     SELECT id, name, type FROM ledger_categories
     WHERE id = ${input.categoryId} AND tenant_id = ${tenantId}
@@ -261,21 +289,16 @@ export async function createLedgerEntry(
   }
 
   const category = catRows[0];
-  if (category.type !== input.type) {
-    const error: any = new Error(`Category type '${category.type}' does not match entry type '${input.type}'`);
-    error.status = 400;
-    throw error;
-  }
+  const entryType = input.type || category.type || "expense";
 
   const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
 
-  // Validate occurredAt is not in the future beyond 15 minutes tolerance
-  const futureTolerance = new Date(Date.now() + 15 * 60 * 1000);
-  if (occurredAt > futureTolerance) {
-    const error: any = new Error("Entry date and time cannot be in the future");
-    error.status = 400;
-    throw error;
-  }
+  const quantity = Number(input.quantity) > 0 ? Number(input.quantity) : 1;
+  const unit = (input.unit || "pcs").trim();
+  const unitCostMinor =
+    input.unitCostMinor !== undefined && input.unitCostMinor !== null && input.unitCostMinor > 0
+      ? Math.round(Number(input.unitCostMinor))
+      : Math.round(Number(input.amountMinor) / quantity);
 
   const rows = await sql`
     INSERT INTO ledger_entries (
@@ -283,7 +306,11 @@ export async function createLedgerEntry(
       type,
       title,
       category_id,
+      quantity,
+      unit,
+      unit_cost_minor,
       amount_minor,
+      vendor_name,
       currency,
       payment_method,
       occurred_at,
@@ -291,12 +318,16 @@ export async function createLedgerEntry(
       added_by_name
     ) VALUES (
       ${tenantId},
-      ${input.type},
+      ${entryType},
       ${input.title.trim()},
       ${input.categoryId},
+      ${quantity},
+      ${unit},
+      ${unitCostMinor},
       ${input.amountMinor},
-      ${input.currency || 'PKR'},
-      ${input.paymentMethod || null},
+      ${input.vendorName ? input.vendorName.trim() : null},
+      ${input.currency || "PKR"},
+      ${input.paymentMethod || "cash"},
       ${occurredAt.toISOString()},
       ${userId},
       ${userName}
@@ -304,8 +335,13 @@ export async function createLedgerEntry(
     RETURNING *;
   `;
 
+  const row = rows[0];
   return {
-    ...rows[0],
+    ...row,
+    quantity: Number(row.quantity || 1),
+    unit: row.unit || "pcs",
+    unit_cost_minor: Number(row.unit_cost_minor || row.amount_minor),
+    amount_minor: Number(row.amount_minor),
     category_name: category.name,
   } as unknown as LedgerEntry;
 }
@@ -319,7 +355,6 @@ export async function voidLedgerEntry(
 ) {
   await ensureLedgerSchema();
 
-  // Query entry strictly scoped to tenant_id
   const existing = await sql`
     SELECT id, tenant_id, is_voided, title
     FROM ledger_entries
@@ -353,27 +388,60 @@ export async function voidLedgerEntry(
   return updated[0] as unknown as LedgerEntry;
 }
 
-// 8. Get Paginated Ledger Entries with Server-Side Totals
-export async function getLedgerEntries(tenantId: string, filters: LedgerFilterInput) {
+// 8. Get Paginated Ledger Entries with Server-Side Totals & Item Breakdown (Date / Month / Year Filters)
+export async function getLedgerEntries(
+  tenantId: string,
+  filters: LedgerFilterInput,
+  timezone: string = "Asia/Karachi"
+) {
   await ensureLedgerSchema();
 
-  const page = filters.page || 1;
-  const limit = Math.min(100, filters.limit || 50);
-  const offset = (page - 1) * limit;
+  const limit = Math.min(10000, filters.limit || 50);
+  const offset =
+    filters.offset !== undefined
+      ? Number(filters.offset)
+      : ((filters.page || 1) - 1) * limit;
+  const page = Math.floor(offset / limit) + 1;
 
-  // Build dynamic SQL query with parameters
-  let conditions = [sql`e.tenant_id = ${tenantId}`];
+  // Build dynamic SQL conditions strictly isolated by tenant_id
+  const conditions = [sql`e.tenant_id = ${tenantId}`];
 
   if (filters.type) {
     conditions.push(sql`e.type = ${filters.type}`);
   }
 
-  if (filters.categoryId) {
+  if (filters.categoryId && filters.categoryId !== "all") {
     conditions.push(sql`e.category_id = ${filters.categoryId}`);
   }
 
   if (filters.addedBy) {
     conditions.push(sql`e.added_by = ${filters.addedBy}`);
+  }
+
+  if (filters.includeVoided === "false") {
+    conditions.push(sql`e.is_voided = false`);
+  }
+
+  // Date / Month / Year / Period filtering in tenant's timezone
+  if (filters.date) {
+    conditions.push(
+      sql`(e.occurred_at AT TIME ZONE ${timezone})::date = ${filters.date}::date`
+    );
+  } else if (filters.month && filters.year) {
+    conditions.push(
+      sql`EXTRACT(MONTH FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${filters.month}`
+    );
+    conditions.push(
+      sql`EXTRACT(YEAR FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${filters.year}`
+    );
+  } else if (filters.year && !filters.month) {
+    conditions.push(
+      sql`EXTRACT(YEAR FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${filters.year}`
+    );
+  } else if (filters.period === "weekly" && !filters.from && !filters.to) {
+    conditions.push(
+      sql`(e.occurred_at AT TIME ZONE ${timezone})::date >= ((NOW() AT TIME ZONE ${timezone})::date - INTERVAL '6 days')`
+    );
   }
 
   if (filters.from) {
@@ -386,20 +454,25 @@ export async function getLedgerEntries(tenantId: string, filters: LedgerFilterIn
 
   if (filters.search && filters.search.trim()) {
     const term = `%${filters.search.trim().toLowerCase()}%`;
-    conditions.push(sql`(LOWER(e.title) LIKE ${term} OR LOWER(c.name) LIKE ${term} OR LOWER(e.added_by_name) LIKE ${term})`);
+    conditions.push(
+      sql`(LOWER(e.title) LIKE ${term} OR LOWER(c.name) LIKE ${term} OR LOWER(COALESCE(e.vendor_name, '')) LIKE ${term} OR LOWER(e.added_by_name) LIKE ${term})`
+    );
   }
 
-  // Combine conditions with AND
   const whereClause = conditions.reduce((prev, curr) => sql`${prev} AND ${curr}`);
 
   // Sorting
   let orderByClause = sql`e.occurred_at DESC`;
-  if (filters.sort === "occurred_at:asc") orderByClause = sql`e.occurred_at ASC`;
-  if (filters.sort === "amount_minor:desc") orderByClause = sql`e.amount_minor DESC`;
-  if (filters.sort === "amount_minor:asc") orderByClause = sql`e.amount_minor ASC`;
+  if (filters.sort === "asc" || filters.sort === "occurred_at:asc") {
+    orderByClause = sql`e.occurred_at ASC`;
+  } else if (filters.sort === "amount_minor:desc") {
+    orderByClause = sql`e.amount_minor DESC`;
+  } else if (filters.sort === "amount_minor:asc") {
+    orderByClause = sql`e.amount_minor ASC`;
+  }
 
   // 1. Fetch paginated entries
-  const entries = await sql`
+  const rawEntries = await sql`
     SELECT 
       e.id,
       e.tenant_id,
@@ -407,7 +480,11 @@ export async function getLedgerEntries(tenantId: string, filters: LedgerFilterIn
       e.title,
       e.category_id,
       c.name as category_name,
+      COALESCE(e.quantity, 1) as quantity,
+      COALESCE(e.unit, 'pcs') as unit,
+      COALESCE(e.unit_cost_minor, e.amount_minor) as unit_cost_minor,
       e.amount_minor,
+      e.vendor_name,
       e.currency,
       e.payment_method,
       e.occurred_at,
@@ -425,6 +502,14 @@ export async function getLedgerEntries(tenantId: string, filters: LedgerFilterIn
     LIMIT ${limit} OFFSET ${offset};
   `;
 
+  const entries: LedgerEntry[] = rawEntries.map((r: any) => ({
+    ...r,
+    quantity: Number(r.quantity || 1),
+    unit: r.unit || "pcs",
+    unit_cost_minor: Number(r.unit_cost_minor || r.amount_minor),
+    amount_minor: Number(r.amount_minor),
+  }));
+
   // 2. Fetch total count for pagination
   const countResult = await sql`
     SELECT COUNT(*)::int as total
@@ -432,13 +517,16 @@ export async function getLedgerEntries(tenantId: string, filters: LedgerFilterIn
     JOIN ledger_categories c ON e.category_id = c.id
     WHERE ${whereClause};
   `;
-  const total = countResult[0]?.total || 0;
+  const totalCount = Number(countResult[0]?.total || 0);
 
   // 3. Compute filtered totals server-side across ALL matching rows (excluding voided)
   const totalsResult = await sql`
     SELECT 
       COALESCE(SUM(CASE WHEN e.type = 'income' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_income,
-      COALESCE(SUM(CASE WHEN e.type = 'expense' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_expense
+      COALESCE(SUM(CASE WHEN e.type = 'expense' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_expense,
+      COALESCE(SUM(CASE WHEN e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as total_all_cost,
+      COALESCE(SUM(CASE WHEN e.is_voided = false THEN COALESCE(e.quantity, 1) ELSE 0 END), 0)::numeric as total_quantity,
+      COUNT(CASE WHEN e.is_voided = false THEN 1 END)::int as active_count
     FROM ledger_entries e
     JOIN ledger_categories c ON e.category_id = c.id
     WHERE ${whereClause};
@@ -446,94 +534,193 @@ export async function getLedgerEntries(tenantId: string, filters: LedgerFilterIn
 
   const totalIncomeMinor = Number(totalsResult[0]?.total_income || 0);
   const totalExpenseMinor = Number(totalsResult[0]?.total_expense || 0);
+  const totalCostMinor = Number(totalsResult[0]?.total_all_cost || 0);
+  const totalQuantity = Number(totalsResult[0]?.total_quantity || 0);
+  const activeCount = Number(totalsResult[0]?.active_count || 0);
   const netMinor = totalIncomeMinor - totalExpenseMinor;
 
+  // 4. Compute aggregated items breakdown for the selected Date / Month / Year filter
+  const itemsBreakdownRows = await sql`
+    SELECT 
+      MAX(e.title) as item_name,
+      COALESCE(e.unit, 'pcs') as unit,
+      MAX(c.name) as category_name,
+      SUM(COALESCE(e.quantity, 1))::numeric as total_quantity,
+      SUM(e.amount_minor)::bigint as total_cost_minor,
+      COUNT(*)::int as purchase_count
+    FROM ledger_entries e
+    JOIN ledger_categories c ON e.category_id = c.id
+    WHERE ${whereClause} AND e.is_voided = false
+    GROUP BY LOWER(TRIM(e.title)), COALESCE(e.unit, 'pcs')
+    ORDER BY total_cost_minor DESC
+    LIMIT 50;
+  `;
+
+  const itemsBreakdown: AggregatedItemSummary[] = itemsBreakdownRows.map((row: any) => {
+    const qty = Number(row.total_quantity || 1);
+    const cost = Number(row.total_cost_minor || 0);
+    return {
+      itemName: row.item_name,
+      unit: row.unit || "pcs",
+      categoryName: row.category_name || "General",
+      totalQuantity: qty,
+      totalCostMinor: cost,
+      avgUnitCostMinor: qty > 0 ? Math.round(cost / qty) : cost,
+      purchaseCount: Number(row.purchase_count || 1),
+    };
+  });
+
   return {
-    entries: entries as unknown as LedgerEntry[],
+    entries,
+    totalCount,
     pagination: {
-      total,
+      total: totalCount,
       page,
       limit,
-      totalPages: Math.ceil(total / limit) || 1,
+      totalPages: Math.ceil(totalCount / limit) || 1,
     },
     filteredTotals: {
       totalIncomeMinor,
       totalExpenseMinor,
+      totalCostMinor,
+      totalQuantity,
+      activeCount,
       netMinor,
     },
+    itemsBreakdown,
   };
 }
 
-// 9. Day Summary (computed in Tenant's Timezone)
-export async function getLedgerSummary(tenantId: string, dateStr?: string, timezone: string = "Asia/Karachi") {
+// 9. Multi-Horizon Summary (Daily, Weekly, Monthly, Yearly Expense & Item Totals)
+export async function getLedgerSummary(
+  tenantId: string,
+  dateStr?: string,
+  timezone: string = "Asia/Karachi",
+  monthParam?: number,
+  yearParam?: number
+) {
   await ensureLedgerSchema();
 
-  // If no date provided, use today in tenant timezone
   const targetDate = dateStr || new Date().toISOString().split("T")[0];
+  const parsedDate = new Date(targetDate);
+  const targetMonth = monthParam || parsedDate.getMonth() + 1;
+  const targetYear = yearParam || parsedDate.getFullYear();
 
-  // Compute timezone-aware day boundary
-  // e.g. 2026-10-17 00:00:00 to 2026-10-17 23:59:59 in timezone
-  const rows = await sql`
+  // Compute Daily, Weekly, Monthly, Yearly totals in a single query
+  const horizonRows = await sql`
     SELECT 
-      COALESCE(SUM(CASE WHEN type = 'income' AND is_voided = false THEN amount_minor ELSE 0 END), 0)::bigint as today_income,
-      COALESCE(SUM(CASE WHEN type = 'expense' AND is_voided = false THEN amount_minor ELSE 0 END), 0)::bigint as today_expense,
-      COUNT(*)::int as total_entries,
-      COALESCE(SUM(CASE WHEN payment_method = 'cash' AND is_voided = false AND type = 'income' THEN amount_minor ELSE 0 END), 0)::bigint as cash_minor,
-      COALESCE(SUM(CASE WHEN payment_method = 'card' AND is_voided = false AND type = 'income' THEN amount_minor ELSE 0 END), 0)::bigint as card_minor,
-      COALESCE(SUM(CASE WHEN payment_method = 'online' AND is_voided = false AND type = 'income' THEN amount_minor ELSE 0 END), 0)::bigint as online_minor,
-      COALESCE(SUM(CASE WHEN payment_method = 'other' AND is_voided = false AND type = 'income' THEN amount_minor ELSE 0 END), 0)::bigint as other_minor
+      -- Specific Day
+      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as day_cost_minor,
+      COUNT(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN 1 END)::int as day_entries,
+      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as day_quantity,
+
+      -- Weekly (7-day window ending on targetDate)
+      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as week_cost_minor,
+      COUNT(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN 1 END)::int as week_entries,
+      COALESCE(SUM(CASE WHEN is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date BETWEEN (${targetDate}::date - INTERVAL '6 days')::date AND ${targetDate}::date THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as week_quantity,
+
+      -- Monthly (targetMonth & targetYear)
+      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN amount_minor ELSE 0 END), 0)::bigint as month_cost_minor,
+      COUNT(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN 1 END)::int as month_entries,
+      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(MONTH FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetMonth} AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as month_quantity,
+
+      -- Yearly (targetYear)
+      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN amount_minor ELSE 0 END), 0)::bigint as year_cost_minor,
+      COUNT(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN 1 END)::int as year_entries,
+      COALESCE(SUM(CASE WHEN is_voided = false AND EXTRACT(YEAR FROM (occurred_at AT TIME ZONE ${timezone})) = ${targetYear} THEN COALESCE(quantity, 1) ELSE 0 END), 0)::numeric as year_quantity,
+
+      -- Payment split on targetDate
+      COALESCE(SUM(CASE WHEN payment_method = 'cash' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as cash_minor,
+      COALESCE(SUM(CASE WHEN payment_method = 'card' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as card_minor,
+      COALESCE(SUM(CASE WHEN payment_method = 'online' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as online_minor,
+      COALESCE(SUM(CASE WHEN payment_method = 'other' AND is_voided = false AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date THEN amount_minor ELSE 0 END), 0)::bigint as other_minor
     FROM ledger_entries
-    WHERE 
-      tenant_id = ${tenantId}
-      AND (occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date;
+    WHERE tenant_id = ${tenantId};
   `;
 
-  // Top expense category for this day
+  // Top category for the selected month
   const topExpense = await sql`
     SELECT c.name, SUM(e.amount_minor)::bigint as amount_minor
     FROM ledger_entries e
     JOIN ledger_categories c ON e.category_id = c.id
     WHERE 
       e.tenant_id = ${tenantId}
-      AND e.type = 'expense'
       AND e.is_voided = false
-      AND (e.occurred_at AT TIME ZONE ${timezone})::date = ${targetDate}::date
+      AND EXTRACT(MONTH FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${targetMonth}
+      AND EXTRACT(YEAR FROM (e.occurred_at AT TIME ZONE ${timezone})) = ${targetYear}
     GROUP BY c.name
     ORDER BY amount_minor DESC
     LIMIT 1;
   `;
 
-  const summary = rows[0] || {};
-  const todayIncomeMinor = Number(summary.today_income || 0);
-  const todayExpenseMinor = Number(summary.today_expense || 0);
-  const netMinor = todayIncomeMinor - todayExpenseMinor;
+  const s = horizonRows[0] || {};
+  const dayCostMinor = Number(s.day_cost_minor || 0);
+  const weekCostMinor = Number(s.week_cost_minor || 0);
+  const monthCostMinor = Number(s.month_cost_minor || 0);
+  const yearCostMinor = Number(s.year_cost_minor || 0);
 
   return {
     date: targetDate,
+    month: targetMonth,
+    year: targetYear,
     timezone,
-    todayIncomeMinor,
-    todayExpenseMinor,
-    netMinor,
-    entryCount: Number(summary.total_entries || 0),
+    // Multi-horizon tracking (Daily, Weekly, Monthly, Yearly)
+    daily: {
+      costMinor: dayCostMinor,
+      entries: Number(s.day_entries || 0),
+      quantity: Number(s.day_quantity || 0),
+    },
+    weekly: {
+      costMinor: weekCostMinor,
+      entries: Number(s.week_entries || 0),
+      quantity: Number(s.week_quantity || 0),
+    },
+    monthly: {
+      costMinor: monthCostMinor,
+      entries: Number(s.month_entries || 0),
+      quantity: Number(s.month_quantity || 0),
+    },
+    yearly: {
+      costMinor: yearCostMinor,
+      entries: Number(s.year_entries || 0),
+      quantity: Number(s.year_quantity || 0),
+    },
+    // Backwards-compatible summary fields
+    totalIncomeMinor: 0,
+    totalExpenseMinor: dayCostMinor,
+    todayIncomeMinor: 0,
+    todayExpenseMinor: dayCostMinor,
+    netMinor: -dayCostMinor,
+    count: Number(s.day_entries || 0),
+    entryCount: Number(s.day_entries || 0),
     topExpenseCategory: topExpense[0]
       ? { name: topExpense[0].name, amountMinor: Number(topExpense[0].amount_minor) }
       : null,
+    paymentSplit: {
+      cash: Number(s.cash_minor || 0),
+      card: Number(s.card_minor || 0),
+      online: Number(s.online_minor || 0),
+      other: Number(s.other_minor || 0),
+    },
     paymentMethodSplit: {
-      cashMinor: Number(summary.cash_minor || 0),
-      cardMinor: Number(summary.card_minor || 0),
-      onlineMinor: Number(summary.online_minor || 0),
-      otherMinor: Number(summary.other_minor || 0),
+      cashMinor: Number(s.cash_minor || 0),
+      cardMinor: Number(s.card_minor || 0),
+      onlineMinor: Number(s.online_minor || 0),
+      otherMinor: Number(s.other_minor || 0),
     },
   };
 }
 
-// 10. Chart Analytics Series (7d, 30d, 90d)
-export async function getLedgerChartData(tenantId: string, rangeStr: string = "30d", timezone: string = "Asia/Karachi") {
+// 10. Chart Analytics Series (7d Daily, 30d Daily, 90d Daily)
+export async function getLedgerChartData(
+  tenantId: string,
+  rangeStr: string = "30d",
+  timezone: string = "Asia/Karachi"
+) {
   await ensureLedgerSchema();
 
   const days = rangeStr === "7d" ? 7 : rangeStr === "90d" ? 90 : 30;
 
-  // Daily income and expense series
   const dailySeries = await sql`
     WITH date_range AS (
       SELECT (NOW() AT TIME ZONE ${timezone})::date - (n || ' days')::interval as day_date
@@ -543,7 +730,8 @@ export async function getLedgerChartData(tenantId: string, rangeStr: string = "3
       TO_CHAR(d.day_date, 'YYYY-MM-DD') as date,
       TO_CHAR(d.day_date, 'Mon DD') as label,
       COALESCE(SUM(CASE WHEN e.type = 'income' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as income_minor,
-      COALESCE(SUM(CASE WHEN e.type = 'expense' AND e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as expense_minor
+      COALESCE(SUM(CASE WHEN e.is_voided = false THEN e.amount_minor ELSE 0 END), 0)::bigint as expense_minor,
+      COUNT(CASE WHEN e.is_voided = false THEN 1 END)::int as item_count
     FROM date_range d
     LEFT JOIN ledger_entries e 
       ON e.tenant_id = ${tenantId}
@@ -552,7 +740,6 @@ export async function getLedgerChartData(tenantId: string, rangeStr: string = "3
     ORDER BY d.day_date ASC;
   `;
 
-  // Category breakdown for expenses in this range
   const categoryBreakdown = await sql`
     SELECT 
       c.name,
@@ -562,29 +749,36 @@ export async function getLedgerChartData(tenantId: string, rangeStr: string = "3
     JOIN ledger_categories c ON e.category_id = c.id
     WHERE 
       e.tenant_id = ${tenantId}
-      AND e.type = 'expense'
       AND e.is_voided = false
-      AND e.occurred_at >= (NOW() - (${days || ' days'}::interval))
+      AND e.occurred_at >= (NOW() - (${days || " days"}::interval))
     GROUP BY c.name
     ORDER BY amount_minor DESC
     LIMIT 8;
   `;
 
-  // Payment method breakdown for income in this range
-  const paymentBreakdown = await sql`
+  const topItems = await sql`
     SELECT 
-      COALESCE(payment_method, 'other') as method,
-      SUM(amount_minor)::bigint as amount_minor,
+      MAX(e.title) as name,
+      COALESCE(e.unit, 'pcs') as unit,
+      SUM(COALESCE(e.quantity, 1))::numeric as total_quantity,
+      SUM(e.amount_minor)::bigint as amount_minor,
       COUNT(*)::int as count
-    FROM ledger_entries
+    FROM ledger_entries e
     WHERE 
-      tenant_id = ${tenantId}
-      AND type = 'income'
-      AND is_voided = false
-      AND occurred_at >= (NOW() - (${days || ' days'}::interval))
-    GROUP BY payment_method
-    ORDER BY amount_minor DESC;
+      e.tenant_id = ${tenantId}
+      AND e.is_voided = false
+      AND e.occurred_at >= (NOW() - (${days || " days"}::interval))
+    GROUP BY LOWER(TRIM(e.title)), COALESCE(e.unit, 'pcs')
+    ORDER BY amount_minor DESC
+    LIMIT 6;
   `;
+
+  const categoriesFormatted = categoryBreakdown.map((c: any) => ({
+    name: c.name,
+    amountMinor: Number(c.amount_minor),
+    count: Number(c.count),
+    type: "expense" as const,
+  }));
 
   return {
     range: `${days}d`,
@@ -593,38 +787,40 @@ export async function getLedgerChartData(tenantId: string, rangeStr: string = "3
       label: d.label,
       incomeMinor: Number(d.income_minor),
       expenseMinor: Number(d.expense_minor),
-      netMinor: Number(d.income_minor) - Number(d.expense_minor),
+      itemCount: Number(d.item_count || 0),
+      netMinor: -Number(d.expense_minor),
     })),
-    categoryBreakdown: categoryBreakdown.map((c: any) => ({
-      name: c.name,
-      amountMinor: Number(c.amount_minor),
-      count: Number(c.count),
+    categories: categoriesFormatted,
+    categoryBreakdown: categoriesFormatted,
+    topItems: topItems.map((item: any) => ({
+      name: item.name,
+      unit: item.unit || "pcs",
+      totalQuantity: Number(item.total_quantity || 0),
+      amountMinor: Number(item.amount_minor || 0),
+      count: Number(item.count || 0),
     })),
-    paymentBreakdown: paymentBreakdown.map((p: any) => ({
-      method: p.method,
-      amountMinor: Number(p.amount_minor),
-      count: Number(p.count),
-    })),
+    paymentSplit: { cash: 0, card: 0, online: 0, other: 0 },
   };
 }
 
 // 11. Excel-Friendly CSV Export Stream with UTF-8 BOM
 export async function generateLedgerCsv(tenantId: string, filters: LedgerFilterInput) {
-  // Fetch all matching rows up to 10,000 without pagination limit for export
-  const exportFilters = { ...filters, page: 1, limit: 10000 };
+  const exportFilters = { ...filters, page: 1, offset: 0, limit: 10000 };
   const { entries } = await getLedgerEntries(tenantId, exportFilters);
 
-  // UTF-8 BOM for Microsoft Excel compatibility
   const BOM = "\uFEFF";
   const headers = [
     "Entry ID",
     "Date",
     "Time",
-    "Title",
+    "Item Brought / Title",
+    "Quantity",
+    "Unit",
+    "Unit Cost (PKR)",
+    "Total Cost Price (PKR)",
     "Category",
-    "Type",
+    "Vendor / Supplier",
     "Payment Method",
-    "Amount (PKR)",
     "Status",
     "Added By",
     "Created At",
@@ -641,17 +837,21 @@ export async function generateLedgerCsv(tenantId: string, filters: LedgerFilterI
     const d = new Date(e.occurred_at);
     const dateStr = d.toISOString().split("T")[0];
     const timeStr = d.toLocaleTimeString("en-US", { hour12: true });
-    const amountPkr = (e.amount_minor / 100).toFixed(2);
+    const unitCostPkr = ((e.unit_cost_minor || e.amount_minor) / 100).toFixed(2);
+    const totalCostPkr = (e.amount_minor / 100).toFixed(2);
 
     return [
       escapeCsv(e.id),
       escapeCsv(dateStr),
       escapeCsv(timeStr),
       escapeCsv(e.title),
+      escapeCsv(e.quantity || 1),
+      escapeCsv(e.unit || "pcs"),
+      escapeCsv(unitCostPkr),
+      escapeCsv(totalCostPkr),
       escapeCsv(e.category_name || "Uncategorized"),
-      escapeCsv(e.type.toUpperCase()),
-      escapeCsv(e.payment_method ? e.payment_method.toUpperCase() : "N/A"),
-      escapeCsv(e.type === "expense" ? `-${amountPkr}` : amountPkr),
+      escapeCsv(e.vendor_name || ""),
+      escapeCsv(e.payment_method ? e.payment_method.toUpperCase() : "CASH"),
       escapeCsv(e.is_voided ? "VOIDED" : "ACTIVE"),
       escapeCsv(e.added_by_name),
       escapeCsv(e.created_at),
@@ -661,4 +861,3 @@ export async function generateLedgerCsv(tenantId: string, filters: LedgerFilterI
 
   return BOM + [headers.join(","), ...rows].join("\r\n");
 }
-

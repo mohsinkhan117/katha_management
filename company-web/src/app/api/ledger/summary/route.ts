@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertAdminAuth, getLedgerSummary } from "@/lib/ledger/service";
 
-// GET /api/ledger/summary?date=YYYY-MM-DD
+// GET /api/ledger/summary?date=YYYY-MM-DD&month=10&year=2026
 export async function GET(req: NextRequest) {
   try {
     const auth = await assertAdminAuth(req);
     const { searchParams } = new URL(req.url);
     const dateStr = searchParams.get("date") || undefined;
+    const monthParam = searchParams.get("month") ? Number(searchParams.get("month")) : undefined;
+    const yearParam = searchParams.get("year") ? Number(searchParams.get("year")) : undefined;
 
-    const summary = await getLedgerSummary(auth.tenantId, dateStr, auth.timezone);
+    const summary = await getLedgerSummary(
+      auth.tenantId,
+      dateStr,
+      auth.timezone,
+      monthParam,
+      yearParam
+    );
 
     return NextResponse.json({
       success: true,
@@ -22,4 +30,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-

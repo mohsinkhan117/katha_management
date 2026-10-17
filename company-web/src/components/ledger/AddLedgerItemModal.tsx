@@ -5,16 +5,17 @@ import {
   X,
   Plus,
   Loader2,
-  TrendingUp,
-  TrendingDown,
+  ShoppingBag,
   CreditCard,
   Banknote,
   Globe,
   HelpCircle,
   Calendar,
-  Clock,
   User,
   CheckCircle2,
+  Package,
+  Store,
+  Calculator,
 } from "lucide-react";
 import { LedgerCategory } from "@/lib/ledger/service";
 
@@ -23,22 +24,53 @@ interface AddLedgerItemModalProps {
   onClose: () => void;
   categories: LedgerCategory[];
   currentUserName: string;
+  defaultDate?: string;
   onSuccess: () => void;
   onCategoryCreated: (category: LedgerCategory) => void;
 }
+
+const COMMON_UNITS = [
+  { value: "pcs", label: "Pieces / Nos (pcs)" },
+  { value: "kg", label: "Kilograms (kg)" },
+  { value: "g", label: "Grams (g)" },
+  { value: "ltr", label: "Liters (ltr)" },
+  { value: "dozen", label: "Dozen (12 pcs)" },
+  { value: "bags", label: "Bags / Sacks" },
+  { value: "crates", label: "Crates / Peti" },
+  { value: "packs", label: "Packs / Cartons" },
+  { value: "bill", label: "Bill / Fixed Expense" },
+];
+
+const QUICK_ITEMS = [
+  { title: "Chicken", unit: "pcs", categoryHint: "Meat & Poultry" },
+  { title: "Chicken Meat", unit: "kg", categoryHint: "Meat & Poultry" },
+  { title: "Beef / Mutton", unit: "kg", categoryHint: "Meat & Poultry" },
+  { title: "Basmati Rice", unit: "kg", categoryHint: "Groceries & Spices" },
+  { title: "Cooking Oil / Ghee", unit: "ltr", categoryHint: "Groceries & Spices" },
+  { title: "Onions & Tomatoes", unit: "kg", categoryHint: "Vegetables & Fruits" },
+  { title: "Potatoes", unit: "kg", categoryHint: "Vegetables & Fruits" },
+  { title: "Milk & Yogurt", unit: "ltr", categoryHint: "Dairy & Bakery" },
+  { title: "Eggs", unit: "dozen", categoryHint: "Dairy & Bakery" },
+  { title: "Atta / Flour", unit: "bags", categoryHint: "Groceries & Spices" },
+  { title: "LPG Gas Cylinder", unit: "pcs", categoryHint: "Kitchen Supplies & Gas" },
+];
 
 export function AddLedgerItemModal({
   isOpen,
   onClose,
   categories,
   currentUserName,
+  defaultDate,
   onSuccess,
   onCategoryCreated,
 }: AddLedgerItemModalProps) {
-  const [type, setType] = useState<"income" | "expense">("income");
   const [title, setTitle] = useState("");
+  const [quantityInput, setQuantityInput] = useState("1");
+  const [unit, setUnit] = useState("pcs");
+  const [unitCostInput, setUnitCostInput] = useState("");
+  const [totalCostInput, setTotalCostInput] = useState("");
+  const [vendorName, setVendorName] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [amountInput, setAmountInput] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "online" | "other">("cash");
   const [dateTime, setDateTime] = useState("");
 
@@ -53,43 +85,100 @@ export function AddLedgerItemModal({
 
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  // Filter expense categories (or all if none)
+  const expenseCategories = categories.filter((c) => c.type === "expense");
+  const activeCategories = expenseCategories.length > 0 ? expenseCategories : categories;
+
   // Initialize date time string to local ISO
   useEffect(() => {
     if (isOpen) {
       const now = new Date();
       const offsetMs = now.getTimezoneOffset() * 60000;
-      const localISOTime = new Date(now.getTime() - offsetMs).toISOString().slice(0, 16);
-      setDateTime(localISOTime);
+      const localNowISO = new Date(now.getTime() - offsetMs).toISOString().slice(0, 16);
+
+      if (defaultDate && defaultDate !== localNowISO.slice(0, 10)) {
+        setDateTime(`${defaultDate}T12:00`);
+      } else {
+        setDateTime(localNowISO);
+      }
       setError(null);
       setSuccessToast(null);
 
-      // Autofocus Title input for fast keyboard entry
       setTimeout(() => {
         titleInputRef.current?.focus();
       }, 100);
     }
-  }, [isOpen]);
+  }, [isOpen, defaultDate]);
 
-  // Filter categories by selected Type
-  const filteredCategories = categories.filter((c) => c.type === type);
-
-  // Auto-select first matching category when type changes
+  // Auto-select first category
   useEffect(() => {
-    if (filteredCategories.length > 0) {
-      if (!filteredCategories.some((c) => c.id === categoryId)) {
-        setCategoryId(filteredCategories[0].id);
+    if (activeCategories.length > 0) {
+      if (!activeCategories.some((c) => c.id === categoryId)) {
+        setCategoryId(activeCategories[0].id);
       }
     } else {
       setCategoryId("");
     }
-  }, [type, filteredCategories, categoryId]);
+  }, [activeCategories, categoryId]);
 
   if (!isOpen) return null;
 
-  // Convert decimal PKR input to integer minor units (paise)
-  const getAmountMinor = (): number => {
-    const parsed = parseFloat(amountInput);
+  // Two-way calculation handlers for Quantity, Unit Cost, and Total Cost Price
+  const handleQuantityChange = (val: string) => {
+    setQuantityInput(val);
+    const qty = parseFloat(val);
+    const uCost = parseFloat(unitCostInput);
+    if (!isNaN(qty) && qty > 0 && !isNaN(uCost) && uCost > 0) {
+      setTotalCostInput((qty * uCost).toFixed(2).replace(/\.00$/, ""));
+    }
+  };
+
+  const handleUnitCostChange = (val: string) => {
+    setUnitCostInput(val);
+    const qty = parseFloat(quantityInput) || 1;
+    const uCost = parseFloat(val);
+    if (!isNaN(uCost) && uCost >= 0) {
+      setTotalCostInput((qty * uCost).toFixed(2).replace(/\.00$/, ""));
+    } else {
+      setTotalCostInput("");
+    }
+  };
+
+  const handleTotalCostChange = (val: string) => {
+    setTotalCostInput(val);
+    const qty = parseFloat(quantityInput) || 1;
+    const tCost = parseFloat(val);
+    if (!isNaN(tCost) && tCost >= 0 && qty > 0) {
+      setUnitCostInput((tCost / qty).toFixed(2).replace(/\.00$/, ""));
+    } else {
+      setUnitCostInput("");
+    }
+  };
+
+  const handleQuickItemSelect = (item: (typeof QUICK_ITEMS)[number]) => {
+    setTitle(item.title);
+    setUnit(item.unit);
+    const matchedCat = activeCategories.find(
+      (c) => c.name.toLowerCase() === item.categoryHint.toLowerCase()
+    );
+    if (matchedCat) {
+      setCategoryId(matchedCat.id);
+    }
+  };
+
+  const getTotalAmountMinor = (): number => {
+    const parsed = parseFloat(totalCostInput);
     if (isNaN(parsed) || parsed <= 0) return 0;
+    return Math.round(parsed * 100);
+  };
+
+  const getUnitCostMinor = (): number => {
+    const parsed = parseFloat(unitCostInput);
+    if (isNaN(parsed) || parsed <= 0) {
+      const total = getTotalAmountMinor();
+      const qty = parseFloat(quantityInput) || 1;
+      return qty > 0 ? Math.round(total / qty) : total;
+    }
     return Math.round(parsed * 100);
   };
 
@@ -102,7 +191,7 @@ export function AddLedgerItemModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newCategoryName.trim(),
-          type,
+          type: "expense",
         }),
       });
       const json = await res.json();
@@ -122,18 +211,25 @@ export function AddLedgerItemModal({
   };
 
   const submitEntry = async (keepOpen: boolean = false) => {
-    const amountMinor = getAmountMinor();
+    const amountMinor = getTotalAmountMinor();
+    const unitCostMinor = getUnitCostMinor();
+    const quantity = parseFloat(quantityInput) || 1;
+
     if (!title.trim()) {
-      setError("Please provide an entry title.");
+      setError("Please enter the item name (e.g., Chicken, Rice, Cooking Oil).");
       titleInputRef.current?.focus();
       return;
     }
     if (!categoryId) {
-      setError("Please select a valid category.");
+      setError("Please select a category.");
+      return;
+    }
+    if (quantity <= 0) {
+      setError("Quantity must be greater than 0.");
       return;
     }
     if (amountMinor <= 0) {
-      setError("Amount must be greater than 0.00.");
+      setError("Please enter the Cost Price (greater than Rs. 0).");
       return;
     }
 
@@ -142,10 +238,14 @@ export function AddLedgerItemModal({
       setError(null);
 
       const payload = {
-        type,
+        type: "expense" as const,
         title: title.trim(),
         categoryId,
+        quantity,
+        unit,
+        unitCostMinor,
         amountMinor,
+        vendorName: vendorName.trim() || null,
         currency: "PKR",
         paymentMethod,
         occurredAt: dateTime ? new Date(dateTime).toISOString() : new Date().toISOString(),
@@ -162,15 +262,24 @@ export function AddLedgerItemModal({
         onSuccess();
         if (keepOpen) {
           setTitle("");
-          setAmountInput("");
-          setSuccessToast(`Entry "${payload.title}" saved. Ready for next entry.`);
+          setQuantityInput("1");
+          setUnitCostInput("");
+          setTotalCostInput("");
+          setSuccessToast(
+            `Added "${quantity} ${unit} ${payload.title}" (Rs. ${(amountMinor / 100).toLocaleString()}) to Khata!`
+          );
           setTimeout(() => setSuccessToast(null), 3500);
           titleInputRef.current?.focus();
         } else {
+          setTitle("");
+          setQuantityInput("1");
+          setUnitCostInput("");
+          setTotalCostInput("");
+          setVendorName("");
           onClose();
         }
       } else {
-        setError(json.error || "Failed to save ledger entry.");
+        setError(json.error || "Failed to save item entry.");
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
@@ -186,33 +295,33 @@ export function AddLedgerItemModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 relative max-h-[92vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 relative max-h-[92vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition"
           tabIndex={-1}
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Modal Header */}
-        <div className="flex items-center gap-3 mb-5">
-          <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${
-              type === "income" ? "bg-emerald-600 shadow-emerald-600/30" : "bg-rose-600 shadow-rose-600/30"
-            } shadow-md transition-colors`}
-          >
-            {type === "income" ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white bg-emerald-600 shadow-md shadow-emerald-600/25">
+            <ShoppingBag className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Record Commercial Ledger Entry</h2>
-            <p className="text-xs text-slate-500">Shop owner append-only money in and out tracker</p>
+            <h2 className="text-lg font-bold text-slate-900">
+              Add Item Brought to Hotel / Khata
+            </h2>
+            <p className="text-xs text-slate-500">
+              Record item name, quantity (e.g. 100 Chicken), and its cost price for daily, weekly & monthly tracking
+            </p>
           </div>
         </div>
 
         {/* Feedback Alerts */}
         {error && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs animate-in fade-in">
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-medium animate-in fade-in">
             {error}
           </div>
         )}
@@ -224,207 +333,301 @@ export function AddLedgerItemModal({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* 1. Income vs Expense Toggle */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1.5">Entry Type *</label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+        {/* Quick Select Common Hotel Items */}
+        <div className="mb-4">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">
+            Quick Pick Common Items:
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_ITEMS.map((item) => (
               <button
+                key={item.title}
                 type="button"
-                onClick={() => setType("income")}
-                className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold transition-all ${
-                  type === "income"
-                    ? "bg-white text-emerald-700 shadow-sm border border-emerald-200"
-                    : "text-slate-500 hover:text-slate-800"
+                onClick={() => handleQuickItemSelect(item)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition ${
+                  title.toLowerCase() === item.title.toLowerCase()
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                    : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
                 }`}
               >
-                <TrendingUp className="w-4 h-4 text-emerald-600" />
-                Income (Money In)
+                + {item.title}
               </button>
-              <button
-                type="button"
-                onClick={() => setType("expense")}
-                className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold transition-all ${
-                  type === "expense"
-                    ? "bg-white text-rose-700 shadow-sm border border-rose-200"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <TrendingDown className="w-4 h-4 text-rose-600" />
-                Expense (Money Out)
-              </button>
-            </div>
+            ))}
           </div>
+        </div>
 
-          {/* 2. Title & Amount */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Title / Description *</label>
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          {/* 1. Item Name */}
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">
+              Item Brought / Expense Title *
+            </label>
+            <div className="relative">
+              <Package className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 ref={titleInputRef}
                 type="text"
                 required
-                placeholder={type === "income" ? "e.g. Counter Cash Sales" : "e.g. Shop Rent October"}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
+                placeholder="e.g., Chicken, Basmati Rice, Cooking Oil, Fresh Milk..."
+                className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 font-medium text-sm"
               />
             </div>
+          </div>
 
+          {/* 2. Quantity & Unit */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Amount (PKR) *</label>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Quantity Brought *
+              </label>
               <input
                 type="number"
                 step="0.01"
                 min="0.01"
                 required
-                placeholder="0.00"
-                value={amountInput}
-                onChange={(e) => setAmountInput(e.target.value)}
-                className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 font-mono font-bold text-sm ${
-                  type === "income" ? "text-emerald-700 focus:ring-emerald-500/20" : "text-rose-700 focus:ring-rose-500/20"
-                }`}
+                value={quantityInput}
+                onChange={(e) => handleQuantityChange(e.target.value)}
+                placeholder="e.g., 100"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 font-bold text-sm font-mono"
               />
             </div>
-          </div>
 
-          {/* 3. Category Selector & Add New Category */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="font-semibold text-slate-700">Category *</label>
-              <button
-                type="button"
-                onClick={() => setIsAddingCategory(!isAddingCategory)}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
-              >
-                <Plus className="w-3 h-3" />
-                {isAddingCategory ? "Select existing" : "Add custom category"}
-              </button>
-            </div>
-
-            {isAddingCategory ? (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder={`New ${type} category name...`}
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-                <button
-                  type="button"
-                  disabled={isCreatingCategory || !newCategoryName.trim()}
-                  onClick={handleCreateCategory}
-                  className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold disabled:opacity-60 transition"
-                >
-                  {isCreatingCategory ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
-                </button>
-              </div>
-            ) : (
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Measurement Unit *
+              </label>
               <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                required
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 font-medium text-xs"
               >
-                {filteredCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.is_default ? "(Default)" : ""}
+                {COMMON_UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
                   </option>
                 ))}
               </select>
-            )}
-          </div>
-
-          {/* 4. Payment Method */}
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1.5">Payment Method</label>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { key: "cash", label: "Cash", icon: Banknote },
-                { key: "card", label: "Card", icon: CreditCard },
-                { key: "online", label: "Online", icon: Globe },
-                { key: "other", label: "Other", icon: HelpCircle },
-              ].map((m) => {
-                const Icon = m.icon;
-                const isSelected = paymentMethod === m.key;
-                return (
-                  <button
-                    key={m.key}
-                    type="button"
-                    onClick={() => setPaymentMethod(m.key as any)}
-                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-[11px] font-semibold transition ${
-                      isSelected
-                        ? "bg-blue-50 border-blue-500 text-blue-700 shadow-sm"
-                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 mb-1" />
-                    {m.label}
-                  </button>
-                );
-              })}
             </div>
           </div>
 
-          {/* 5. Date & Time & Added By (Audit) */}
+          {/* 3. Cost Price Calculator Box (Unit Cost & Total Cost Price) */}
+          <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Calculator className="w-3.5 h-3.5 text-emerald-600" />
+                Cost Price Details (Enter either Unit Rate or Total Cost)
+              </span>
+              {getTotalAmountMinor() > 0 && (
+                <span className="text-xs font-extrabold text-emerald-700 font-mono">
+                  {quantityInput || 1} {unit} × Rs.{" "}
+                  {(getUnitCostMinor() / 100).toLocaleString()} = Rs.{" "}
+                  {(getTotalAmountMinor() / 100).toLocaleString()}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Rate per {unit} (PKR)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
+                    Rs.
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={unitCostInput}
+                    onChange={(e) => handleUnitCostChange(e.target.value)}
+                    placeholder="e.g., 450"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 font-mono font-semibold text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-emerald-900 block mb-1">
+                  Total Cost Price (PKR) *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-700 font-bold text-xs">
+                    Rs.
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={totalCostInput}
+                    onChange={(e) => handleTotalCostChange(e.target.value)}
+                    placeholder="e.g., 45000"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-emerald-500/50 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 text-slate-900 font-mono font-extrabold text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Category & Supplier */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Occurred Date & Time</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-semibold text-slate-700">Expense Category *</label>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCategory(!isAddingCategory)}
+                  className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"
+                >
+                  <Plus className="w-3 h-3" />
+                  {isAddingCategory ? "Cancel" : "New Category"}
+                </button>
+              </div>
+
+              {isAddingCategory ? (
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Category name..."
+                    className="flex-1 px-2.5 py-2 rounded-xl border border-emerald-300 focus:outline-none text-slate-900 text-xs"
+                  />
+                  <button
+                    type="button"
+                    disabled={isCreatingCategory || !newCategoryName.trim()}
+                    onClick={handleCreateCategory}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl disabled:opacity-50"
+                  >
+                    {isCreatingCategory ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 font-medium"
+                >
+                  {activeCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Supplier / Market (Optional)
+              </label>
               <div className="relative">
+                <Store className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="datetime-local"
-                  required
-                  value={dateTime}
-                  onChange={(e) => setDateTime(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  type="text"
+                  value={vendorName}
+                  onChange={(e) => setVendorName(e.target.value)}
+                  placeholder="e.g., Sabzi Mandi, Poultry Farm..."
+                  className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900"
                 />
               </div>
             </div>
+          </div>
+
+          {/* 5. Date & Payment Method */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold text-slate-700 flex items-center gap-1 mb-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                Date & Time Brought
+              </label>
+              <input
+                type="datetime-local"
+                value={dateTime}
+                onChange={(e) => setDateTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 font-mono text-xs"
+              />
+            </div>
 
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Recorded By (Session)</label>
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 cursor-not-allowed">
-                <User className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="truncate font-medium">{currentUserName || "Admin"}</span>
+              <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { id: "cash", label: "Cash", icon: Banknote },
+                  { id: "online", label: "Online", icon: Globe },
+                  { id: "card", label: "Card", icon: CreditCard },
+                  { id: "other", label: "Udhaar", icon: HelpCircle },
+                ].map((pm) => {
+                  const Icon = pm.icon;
+                  const active = paymentMethod === pm.id;
+                  return (
+                    <button
+                      key={pm.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(pm.id as any)}
+                      className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 rounded-lg border font-semibold transition-all text-[10px] ${
+                        active
+                          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{pm.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
 
+          {/* Recorded By Read-only Info */}
+          <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200/80 text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-slate-400" />
+              Recorded by:{" "}
+              <strong className="text-slate-700">{currentUserName || "Admin"}</strong>
+            </span>
+            <span className="text-[11px] text-emerald-700 font-semibold">
+              Party Khata Expense
+            </span>
+          </div>
+
           {/* Action Buttons */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => submitEntry(true)}
-              disabled={isSubmitting}
-              className="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition disabled:opacity-60"
+              onClick={onClose}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition"
             >
-              Save & Add Another
+              Cancel
             </button>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-slate-500 hover:text-slate-800 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`px-5 py-2 text-white font-bold rounded-xl shadow-md flex items-center gap-1.5 transition disabled:opacity-60 ${
-                  type === "income" ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20" : "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20"
-                }`}
-              >
-                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Save Entry (Enter)
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => submitEntry(true)}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              Save & Add Next Item
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Item to Khata
+            </button>
           </div>
         </form>
       </div>
     </div>
   );
 }
-

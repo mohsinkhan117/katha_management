@@ -2,18 +2,16 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Receipt,
   Plus,
   ShieldCheck,
-  ShieldAlert,
-  HelpCircle,
   FileSpreadsheet,
   Lock,
+  ShoppingBag,
 } from "lucide-react";
 import { useUser } from "@stackframe/stack";
 import { useTenant } from "@/context/TenantContext";
 import { LedgerCategory, LedgerEntry } from "@/lib/ledger/service";
-import { TodaySummaryCards } from "@/components/ledger/TodaySummaryCards";
+import { TodaySummaryCards, FilterPeriodMode } from "@/components/ledger/TodaySummaryCards";
 import { LedgerCharts } from "@/components/ledger/LedgerCharts";
 import { ExcelLedgerTable } from "@/components/ledger/ExcelLedgerTable";
 import { AddLedgerItemModal } from "@/components/ledger/AddLedgerItemModal";
@@ -28,17 +26,28 @@ export default function CommercialLedgerPage() {
   const [categories, setCategories] = useState<LedgerCategory[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Shared Date / Month / Year Filter State
+  const getTodayIso = () => {
+    const now = new Date();
+    const offsetMs = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - offsetMs).toISOString().split("T")[0];
+  };
+
+  const now = new Date();
+  const [filterMode, setFilterMode] = useState<FilterPeriodMode>("date");
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayIso());
+  const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
+
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedEntryForDetails, setSelectedEntryForDetails] = useState<LedgerEntry | null>(null);
   const [selectedEntryForVoid, setSelectedEntryForVoid] = useState<LedgerEntry | null>(null);
 
-  // Trigger data reload across summary, charts, and table
   const handleRefresh = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  // Fetch available ledger categories
   useEffect(() => {
     let isMounted = true;
     async function loadCategories() {
@@ -65,77 +74,91 @@ export default function CommercialLedgerPage() {
     setCategories((prev) => [...prev, newCat]);
   };
 
-  // Check admin authorization
   if (user && !hasAccess) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-6 space-y-4">
-        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600">
           <Lock className="w-10 h-10" />
         </div>
-        <h2 className="text-xl font-bold text-white">Admin-Only Access</h2>
-        <p className="text-sm text-slate-400 max-w-md">
-          The Commercial Cash & Expense Ledger is strictly restricted to shop owners and tenant administrators.
-          You do not have administrative privileges for this tenant.
+        <h2 className="text-xl font-bold text-slate-900">Admin-Only Khata Access</h2>
+        <p className="text-sm text-slate-500 max-w-md">
+          The Party Expense & Purchase Khata Ledger is restricted to authorized administrators of this tenant.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">
-                Commercial Cash & Expense Ledger
+              <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                Party Khata & Expense Ledger
               </h1>
-              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                <span className="font-medium text-slate-300">
-                  {activeTenant?.name || "Store Operations"}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
+                <span className="font-bold text-slate-700">
+                  {activeTenant?.name || "Hotel / Business Operations"}
                 </span>
                 <span>•</span>
-                <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                <span>
+                  Track items brought (e.g. 100 Chicken + Cost Price) & daily, weekly, monthly expenses
+                </span>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Tenant Isolated
                 </span>
-                <span>•</span>
-                <span className="text-slate-500">Append-Only Audit</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Action Button */}
-        <div className="flex items-center gap-3">
+        {/* Primary Add Item Button */}
+        <div className="flex items-center gap-3 self-start sm:self-auto">
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-lg shadow-emerald-600/20 text-sm transition"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 text-xs sm:text-sm transition"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Transaction</span>
+            <span>Add Item Brought / Expense</span>
           </button>
         </div>
       </div>
 
-      {/* 1. Daily Summary Cards */}
-      <TodaySummaryCards refreshTrigger={refreshTrigger} />
+      {/* 1. Date / Month / Year Filter Bar & Daily, Weekly, Monthly, Yearly Expense Summary Cards */}
+      <TodaySummaryCards
+        refreshTrigger={refreshTrigger}
+        filterMode={filterMode}
+        setFilterMode={setFilterMode}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        selectedMonth={selectedMonth}
+        setSelectedMonth={setSelectedMonth}
+        selectedYear={selectedYear}
+        setSelectedYear={setSelectedYear}
+      />
 
-      {/* 2. Visual Graphs & Expense Analytics */}
-      <LedgerCharts refreshTrigger={refreshTrigger} />
-
-      {/* 3. Excel-Like Interactive Ledger Table */}
+      {/* 2. All Items Brought in Selected Period + Excel-Style Khata Table */}
       <ExcelLedgerTable
         categories={categories}
         refreshTrigger={refreshTrigger}
+        filterMode={filterMode}
+        selectedDate={selectedDate}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
         onRefreshNeeded={handleRefresh}
         onSelectEntryForDetails={(entry) => setSelectedEntryForDetails(entry)}
         onSelectEntryForVoid={(entry) => setSelectedEntryForVoid(entry)}
       />
+
+      {/* 3. Visual Graphs & Expense Analytics (Weekly / Monthly / Quarterly) */}
+      <LedgerCharts refreshTrigger={refreshTrigger} />
 
       {/* Modals & Drawers */}
       <AddLedgerItemModal
@@ -143,6 +166,7 @@ export default function CommercialLedgerPage() {
         onClose={() => setIsAddModalOpen(false)}
         categories={categories}
         currentUserName={user?.displayName || user?.primaryEmail || "Admin"}
+        defaultDate={selectedDate}
         onSuccess={handleRefresh}
         onCategoryCreated={handleCategoryCreated}
       />
@@ -154,7 +178,6 @@ export default function CommercialLedgerPage() {
         onSuccess={() => {
           handleRefresh();
           setSelectedEntryForVoid(null);
-          // If drawer was open for this entry, close it or update it
           if (selectedEntryForDetails?.id === selectedEntryForVoid?.id) {
             setSelectedEntryForDetails(null);
           }
@@ -172,4 +195,3 @@ export default function CommercialLedgerPage() {
     </div>
   );
 }
-

@@ -7,11 +7,11 @@ import {
   User,
   Tag,
   CreditCard,
-  ShieldCheck,
   ShieldAlert,
   Calendar,
-  AlertCircle,
   Hash,
+  Package,
+  Store,
 } from "lucide-react";
 import { LedgerEntry } from "@/lib/ledger/service";
 
@@ -35,45 +35,37 @@ export function LedgerDetailDrawer({
       style: "currency",
       currency: "PKR",
       maximumFractionDigits: 2,
-    }).format(minor / 100);
+    }).format((minor || 0) / 100);
   };
 
-  const isIncome = entry.type === "income";
-
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="absolute inset-0" onClick={onClose} />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col text-slate-100">
+        <div className="w-screen max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col text-slate-900">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 bg-slate-950/60">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-slate-50">
             <div className="flex items-center gap-3">
               <div
-                className={`p-2 rounded-lg border ${
+                className={`p-2 rounded-xl border ${
                   entry.is_voided
-                    ? "bg-slate-800 border-slate-700 text-slate-400"
-                    : isIncome
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                    : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                    ? "bg-slate-100 border-slate-200 text-slate-400"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-600"
                 }`}
               >
-                {entry.is_voided ? (
-                  <ShieldAlert className="w-5 h-5 text-amber-400" />
-                ) : isIncome ? (
-                  <ShieldCheck className="w-5 h-5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5" />
-                )}
+                <Package className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-white">Entry Details</h3>
-                <p className="text-xs text-slate-400 font-mono">ID: {entry.id.slice(0, 8)}...</p>
+                <h3 className="font-bold text-slate-900">Item Khata Details</h3>
+                <p className="text-xs text-slate-500 font-mono">
+                  ID: {entry.id.slice(0, 8)}...
+                </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition"
             >
               <X className="w-5 h-5" />
             </button>
@@ -81,142 +73,147 @@ export function LedgerDetailDrawer({
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Amount Hero */}
-            <div className="p-5 rounded-xl bg-slate-950/80 border border-slate-800 text-center space-y-1">
+            {/* Hero Cost Card */}
+            <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-center space-y-1.5">
               <span
-                className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider mb-2 ${
+                className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
                   entry.is_voided
-                    ? "bg-slate-800 text-slate-400 line-through"
-                    : isIncome
-                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                    : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                    ? "bg-slate-200 text-slate-500 line-through"
+                    : "bg-emerald-600 text-white"
                 }`}
               >
-                {entry.is_voided ? "Voided Record" : isIncome ? "Income" : "Expense"}
+                {entry.is_voided
+                  ? "Voided Entry"
+                  : `${entry.quantity || 1} ${entry.unit || "pcs"} Brought`}
               </span>
               <div
-                className={`text-3xl font-bold font-mono tracking-tight ${
-                  entry.is_voided
-                    ? "text-slate-500 line-through"
-                    : isIncome
-                    ? "text-emerald-400"
-                    : "text-rose-400"
+                className={`text-3xl font-extrabold font-mono tracking-tight ${
+                  entry.is_voided ? "text-slate-400 line-through" : "text-slate-900"
                 }`}
               >
-                {isIncome ? "+" : "-"}
                 {formatCurrency(entry.amount_minor)}
               </div>
-              <p className="text-sm font-medium text-slate-300 pt-1">{entry.title}</p>
+              <p className="text-sm font-bold text-slate-800">{entry.title}</p>
+              <p className="text-xs font-mono text-emerald-800">
+                Unit Rate: {formatCurrency(entry.unit_cost_minor || entry.amount_minor)} /{" "}
+                {entry.unit || "pcs"}
+              </p>
             </div>
 
-            {/* Void Audit Card (if voided) */}
+            {/* Void Audit Box */}
             {entry.is_voided && (
-              <div className="p-4 rounded-lg bg-red-950/20 border border-red-500/30 text-xs space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-red-400 uppercase tracking-wider">
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-rose-700 uppercase tracking-wider">
                   <ShieldAlert className="w-4 h-4" />
-                  <span>Void Audit Information</span>
+                  <span>Void Audit Trail</span>
                 </div>
-                <div className="text-slate-300">
-                  <span className="text-slate-400 font-medium">Reason: </span>
-                  <span className="italic">"{entry.void_reason}"</span>
+                <div className="text-slate-700">
+                  <span className="font-semibold">Reason: </span>
+                  <span className="italic">&ldquo;{entry.void_reason}&rdquo;</span>
                 </div>
                 {entry.voided_at && (
-                  <div className="text-slate-400">
-                    <span className="font-medium">Voided At: </span>
-                    <span className="font-mono text-slate-300">{new Date(entry.voided_at).toLocaleString()}</span>
-                  </div>
-                )}
-                {entry.voided_by && (
-                  <div className="text-slate-400">
-                    <span className="font-medium">Voided By User: </span>
-                    <span className="font-mono text-slate-300">{entry.voided_by}</span>
+                  <div className="text-slate-500">
+                    <span className="font-semibold">Voided At: </span>
+                    <span className="font-mono">
+                      {new Date(entry.voided_at).toLocaleString()}
+                    </span>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Core Fields */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Transaction Meta
+            {/* Metadata Rows */}
+            <div className="space-y-3 text-xs">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Purchase Information
               </h4>
 
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Tag className="w-4 h-4" />
-                    <span>Category</span>
-                  </div>
-                  <span className="font-medium text-slate-200">{entry.category_name}</span>
-                </div>
+              <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                <span className="text-slate-500 flex items-center gap-2">
+                  <Package className="w-4 h-4 text-slate-400" />
+                  Quantity & Unit
+                </span>
+                <span className="font-mono font-bold text-slate-900">
+                  {entry.quantity || 1} {entry.unit || "pcs"}
+                </span>
+              </div>
 
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <CreditCard className="w-4 h-4" />
-                    <span>Payment Method</span>
-                  </div>
-                  <span className="font-medium text-slate-200 capitalize">
-                    {entry.payment_method || "Other"}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                <span className="text-slate-500 flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-slate-400" />
+                  Category
+                </span>
+                <span className="font-semibold text-slate-800">
+                  {entry.category_name || "Expense"}
+                </span>
+              </div>
 
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Calendar className="w-4 h-4" />
-                    <span>Occurred Date & Time</span>
-                  </div>
-                  <span className="font-mono text-xs text-slate-300">
-                    {new Date(entry.occurred_at).toLocaleString()}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                <span className="text-slate-500 flex items-center gap-2">
+                  <Store className="w-4 h-4 text-slate-400" />
+                  Supplier / Vendor
+                </span>
+                <span className="font-semibold text-slate-800">
+                  {entry.vendor_name || "Direct Purchase"}
+                </span>
+              </div>
 
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Clock className="w-4 h-4" />
-                    <span>System Created At</span>
-                  </div>
-                  <span className="font-mono text-xs text-slate-300">
-                    {new Date(entry.created_at).toLocaleString()}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                <span className="text-slate-500 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-slate-400" />
+                  Payment Mode
+                </span>
+                <span className="font-semibold text-slate-800 uppercase">
+                  {entry.payment_method || "Cash"}
+                </span>
+              </div>
 
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <User className="w-4 h-4" />
-                    <span>Recorded By</span>
-                  </div>
-                  <span className="font-medium text-slate-200">
-                    {entry.added_by_name || "Admin"}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                <span className="text-slate-500 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  Date & Time Brought
+                </span>
+                <span className="font-mono text-slate-800">
+                  {new Date(entry.occurred_at).toLocaleString()}
+                </span>
+              </div>
 
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Hash className="w-4 h-4" />
-                    <span>Full UUID</span>
-                  </div>
-                  <span className="font-mono text-xs text-slate-400 select-all">
-                    {entry.id}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                <span className="text-slate-500 flex items-center gap-2">
+                  <User className="w-4 h-4 text-slate-400" />
+                  Recorded By
+                </span>
+                <span className="font-semibold text-slate-800">
+                  {entry.added_by_name || "Admin"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-2.5 border-b border-slate-100">
+                <span className="text-slate-500 flex items-center gap-2">
+                  <Hash className="w-4 h-4 text-slate-400" />
+                  Entry UUID
+                </span>
+                <span className="font-mono text-[11px] text-slate-400 select-all">
+                  {entry.id}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Footer Action */}
-          <div className="p-6 border-t border-slate-800 bg-slate-950/60">
+          <div className="p-6 border-t border-slate-200 bg-slate-50">
             {!entry.is_voided ? (
               <button
                 type="button"
                 onClick={() => onVoidRequest(entry)}
-                className="w-full py-2.5 px-4 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
               >
                 <ShieldAlert className="w-4 h-4" />
-                <span>Void This Entry</span>
+                <span>Void This Item Entry</span>
               </button>
             ) : (
-              <div className="text-center text-xs text-slate-500 italic">
-                This transaction has been voided and is read-only.
+              <div className="text-center text-xs text-slate-400 italic">
+                This entry has been voided and is excluded from all totals.
               </div>
             )}
           </div>
@@ -225,4 +222,3 @@ export function LedgerDetailDrawer({
     </div>
   );
 }
-
