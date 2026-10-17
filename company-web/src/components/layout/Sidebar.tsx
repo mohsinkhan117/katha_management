@@ -17,6 +17,7 @@ import {
   X,
   LogOut,
   Building2,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useTenant } from "@/context/TenantContext";
 
@@ -62,6 +63,13 @@ const navItems: NavItem[] = [
     label: "Territories",
     href: "/territories",
     icon: MapPin,
+  },
+  {
+    label: "Commercial Ledger",
+    href: "/ledger",
+    icon: FileSpreadsheet,
+    badge: "Admin",
+    badgeColor: "bg-emerald-500/10 text-emerald-700 border border-emerald-200",
   },
   {
     label: "Settings",
@@ -129,6 +137,17 @@ export function Sidebar({
       href: "/territories",
       icon: MapPin,
     },
+    ...(hasAccess
+      ? [
+          {
+            label: "Commercial Ledger",
+            href: "/ledger",
+            icon: FileSpreadsheet,
+            badge: "Admin",
+            badgeColor: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30",
+          },
+        ]
+      : []),
     {
       label: "Settings",
       href: "/settings",
