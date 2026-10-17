@@ -21,6 +21,8 @@ import {
   Store,
   X,
 } from "lucide-react";
+import { useUser } from "@stackframe/stack";
+import { useTenant } from "@/context/TenantContext";
 import {
   LedgerEntry,
   LedgerCategory,
@@ -74,6 +76,9 @@ export function ExcelLedgerTable({
   onSelectEntryForDetails,
   onSelectEntryForVoid,
 }: ExcelLedgerTableProps) {
+  const user = useUser();
+  const { activeTenant } = useTenant();
+
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [itemsBreakdown, setItemsBreakdown] = useState<AggregatedItemSummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -161,7 +166,18 @@ export function ExcelLedgerTable({
     setIsLoading(true);
     try {
       const params = buildFilterQueryParams();
-      const res = await fetch(`/api/ledger/entries?${params.toString()}`);
+      const headers: Record<string, string> = {};
+      if (activeTenant?.id) {
+        headers["x-tenant-id"] = activeTenant.id;
+      }
+      const email = user?.primaryEmail || activeTenant?.admin_email;
+      if (email) {
+        headers["x-user-email"] = email;
+      }
+      const res = await fetch(`/api/ledger/entries?${params.toString()}`, {
+        headers,
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch khata entries");
       const json = await res.json();
 
@@ -184,7 +200,7 @@ export function ExcelLedgerTable({
     } finally {
       setIsLoading(false);
     }
-  }, [buildFilterQueryParams]);
+  }, [buildFilterQueryParams, activeTenant?.id, activeTenant?.admin_email, user?.primaryEmail]);
 
   useEffect(() => {
     fetchEntries();
@@ -208,6 +224,9 @@ export function ExcelLedgerTable({
     setIsExporting(true);
     try {
       const params = buildFilterQueryParams();
+      if (activeTenant?.id) {
+        params.set("tenantId", activeTenant.id);
+      }
       window.open(`/api/ledger/export?${params.toString()}`, "_blank");
     } finally {
       setIsExporting(false);

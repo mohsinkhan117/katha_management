@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { BarChart3, PieChart as PieIcon, Loader2 } from "lucide-react";
 
+import { useUser } from "@stackframe/stack";
+import { useTenant } from "@/context/TenantContext";
+
 interface LedgerChartsProps {
   refreshTrigger: number;
 }
@@ -41,6 +44,8 @@ const CATEGORY_COLORS = [
 ];
 
 export function LedgerCharts({ refreshTrigger }: LedgerChartsProps) {
+  const user = useUser();
+  const { activeTenant } = useTenant();
   const [range, setRange] = useState<"7d" | "30d" | "90d">("7d");
   const [data, setData] = useState<ChartData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +56,18 @@ export function LedgerCharts({ refreshTrigger }: LedgerChartsProps) {
     async function fetchChart() {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/ledger/chart?range=${range}`);
+        const headers: Record<string, string> = {};
+        if (activeTenant?.id) {
+          headers["x-tenant-id"] = activeTenant.id;
+        }
+        const email = user?.primaryEmail || activeTenant?.admin_email;
+        if (email) {
+          headers["x-user-email"] = email;
+        }
+        const res = await fetch(`/api/ledger/chart?range=${range}`, {
+          headers,
+          credentials: "include",
+        });
         if (!res.ok) throw new Error("Failed to load chart data");
         const json = await res.json();
         if (isMounted) setData(json.data);
@@ -66,7 +82,7 @@ export function LedgerCharts({ refreshTrigger }: LedgerChartsProps) {
     return () => {
       isMounted = false;
     };
-  }, [range, refreshTrigger]);
+  }, [range, refreshTrigger, activeTenant?.id, user?.primaryEmail]);
 
   const formatCurrency = (minor: number) => {
     return new Intl.NumberFormat("en-PK", {

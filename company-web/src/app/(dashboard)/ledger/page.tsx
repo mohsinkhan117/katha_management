@@ -52,7 +52,18 @@ export default function CommercialLedgerPage() {
     let isMounted = true;
     async function loadCategories() {
       try {
-        const res = await fetch("/api/ledger/categories");
+        const headers: Record<string, string> = {};
+        if (activeTenant?.id) {
+          headers["x-tenant-id"] = activeTenant.id;
+        }
+        const email = user?.primaryEmail || activeTenant?.admin_email;
+        if (email) {
+          headers["x-user-email"] = email;
+        }
+        const res = await fetch("/api/ledger/categories", {
+          headers,
+          credentials: "include",
+        });
         if (res.ok) {
           const json = await res.json();
           if (isMounted) {
@@ -68,7 +79,7 @@ export default function CommercialLedgerPage() {
     return () => {
       isMounted = false;
     };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, activeTenant?.id, user?.primaryEmail, activeTenant?.admin_email]);
 
   const handleCategoryCreated = (newCat: LedgerCategory) => {
     setCategories((prev) => [...prev, newCat]);

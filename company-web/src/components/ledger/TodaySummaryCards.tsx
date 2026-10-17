@@ -15,6 +15,9 @@ import {
   Layers,
 } from "lucide-react";
 
+import { useUser } from "@stackframe/stack";
+import { useTenant } from "@/context/TenantContext";
+
 export type FilterPeriodMode = "date" | "week" | "month" | "year" | "all";
 
 interface TodaySummaryCardsProps {
@@ -74,6 +77,8 @@ export function TodaySummaryCards({
   selectedYear,
   setSelectedYear,
 }: TodaySummaryCardsProps) {
+  const user = useUser();
+  const { activeTenant } = useTenant();
   const [summary, setSummary] = useState<LedgerSummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -95,7 +100,18 @@ export function TodaySummaryCards({
           month: String(selectedMonth),
           year: String(selectedYear),
         });
-        const res = await fetch(`/api/ledger/summary?${params.toString()}`);
+        const headers: Record<string, string> = {};
+        if (activeTenant?.id) {
+          headers["x-tenant-id"] = activeTenant.id;
+        }
+        const email = user?.primaryEmail || activeTenant?.admin_email;
+        if (email) {
+          headers["x-user-email"] = email;
+        }
+        const res = await fetch(`/api/ledger/summary?${params.toString()}`, {
+          headers,
+          credentials: "include",
+        });
         if (!res.ok) throw new Error("Failed to load summary");
         const json = await res.json();
         if (isMounted && json.data) {
@@ -112,7 +128,7 @@ export function TodaySummaryCards({
     return () => {
       isMounted = false;
     };
-  }, [selectedDate, selectedMonth, selectedYear, refreshTrigger]);
+  }, [selectedDate, selectedMonth, selectedYear, refreshTrigger, activeTenant?.id, user?.primaryEmail]);
 
   const formatCurrency = (minor: number) => {
     return new Intl.NumberFormat("en-PK", {

@@ -13,7 +13,8 @@ export type LedgerPeriod = z.infer<typeof LedgerPeriodEnum>;
 export const CreateLedgerEntrySchema = z.object({
   type: LedgerTypeEnum.default("expense"),
   title: z.string().trim().min(1, "Item name / title is required").max(255),
-  categoryId: z.string().uuid("Invalid category ID format"),
+  categoryId: z.string().trim().optional().nullable(),
+  categoryName: z.string().trim().optional().nullable(),
   quantity: z.coerce.number().positive("Quantity must be greater than 0").default(1),
   unit: z.string().trim().min(1).max(32).default("pcs"),
   unitCostMinor: z.coerce.number().int().nonnegative().optional().nullable(),

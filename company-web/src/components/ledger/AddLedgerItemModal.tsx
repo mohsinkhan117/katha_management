@@ -17,6 +17,8 @@ import {
   Store,
   Calculator,
 } from "lucide-react";
+import { useUser } from "@stackframe/stack";
+import { useTenant } from "@/context/TenantContext";
 import { LedgerCategory } from "@/lib/ledger/service";
 
 interface AddLedgerItemModalProps {
@@ -64,6 +66,9 @@ export function AddLedgerItemModal({
   onSuccess,
   onCategoryCreated,
 }: AddLedgerItemModalProps) {
+  const user = useUser();
+  const { activeTenant } = useTenant();
+
   const [title, setTitle] = useState("");
   const [quantityInput, setQuantityInput] = useState("1");
   const [unit, setUnit] = useState("pcs");
@@ -71,6 +76,7 @@ export function AddLedgerItemModal({
   const [totalCostInput, setTotalCostInput] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [localCategories, setLocalCategories] = useState<LedgerCategory[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "online" | "other">("cash");
   const [dateTime, setDateTime] = useState("");
 
@@ -85,9 +91,44 @@ export function AddLedgerItemModal({
 
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter expense categories (or all if none)
-  const expenseCategories = categories.filter((c) => c.type === "expense");
-  const activeCategories = expenseCategories.length > 0 ? expenseCategories : categories;
+  const getAuthHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (activeTenant?.id) {
+      headers["x-tenant-id"] = activeTenant.id;
+    }
+    const email = user?.primaryEmail || activeTenant?.admin_email;
+    if (email) {
+      headers["x-user-email"] = email;
+    }
+    if (currentUserName) {
+      headers["x-user-name"] = currentUserName;
+    }
+    return headers;
+  };
+
+  // Merge prop categories and locally fetched categories
+  const combinedCategories = categories.length > 0 ? categories : localCategories;
+  const expenseCategories = combinedCategories.filter((c) => c.type === "expense");
+  const activeCategories = expenseCategories.length > 0 ? expenseCategories : combinedCategories;
+
+  // Auto-fetch categories if modal opens and categories list is empty
+  useEffect(() => {
+    if (isOpen && categories.length === 0 && localCategories.length === 0) {
+      fetch("/api/ledger/categories", {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && Array.isArray(json.data)) {
+            setLocalCategories(json.data);
+          }
+        })
+        .catch((err) => console.error("Failed to fetch fallback categories:", err));
+    }
+  }, [isOpen, categories.length, localCategories.length, activeTenant?.id]);
 
   // Initialize date time string to local ISO
   useEffect(() => {
@@ -186,9 +227,11 @@ export function AddLedgerItemModal({
     if (!newCategoryName.trim()) return;
     try {
       setIsCreatingCategory(true);
+      setError(null);
       const res = await fetch("/api/ledger/categories", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
+        credentials: "include",
         body: JSON.stringify({
           name: newCategoryName.trim(),
           type: "expense",
@@ -197,6 +240,7 @@ export function AddLedgerItemModal({
       const json = await res.json();
       if (json.success && json.data) {
         onCategoryCreated(json.data);
+        setLocalCategories((prev) => [...prev, json.data]);
         setCategoryId(json.data.id);
         setIsAddingCategory(false);
         setNewCategoryName("");
@@ -220,10 +264,6 @@ export function AddLedgerItemModal({
       titleInputRef.current?.focus();
       return;
     }
-    if (!categoryId) {
-      setError("Please select a category.");
-      return;
-    }
     if (quantity <= 0) {
       setError("Quantity must be greater than 0.");
       return;
@@ -237,10 +277,13 @@ export function AddLedgerItemModal({
       setIsSubmitting(true);
       setError(null);
 
+      const selectedCategoryObj = activeCategories.find((c) => c.id === categoryId);
+
       const payload = {
         type: "expense" as const,
         title: title.trim(),
-        categoryId,
+        categoryId: categoryId || null,
+        categoryName: selectedCategoryObj?.name || null,
         quantity,
         unit,
         unitCostMinor,
@@ -253,7 +296,8 @@ export function AddLedgerItemModal({
 
       const res = await fetch("/api/ledger/entries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
+        credentials: "include",
         body: JSON.stringify(payload),
       });
 
@@ -511,11 +555,15 @@ export function AddLedgerItemModal({
                   onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 font-medium"
                 >
-                  {activeCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  {activeCategories.length > 0 ? (
+                    activeCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">General Khata Expense (Default)</option>
+                  )}
                 </select>
               )}
             </div>

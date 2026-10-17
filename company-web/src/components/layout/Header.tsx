@@ -45,6 +45,10 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
     title: "Territories & Field Zones",
     subtitle: "Geographical sales boundaries and distributor assignments",
   },
+  "/ledger": {
+    title: "Party Khata & Expense Ledger",
+    subtitle: "Track items brought (e.g. 100 Chicken + Cost Price) & daily, weekly, monthly expenses",
+  },
   "/settings": {
     title: "Company Settings",
     subtitle: "Business profile, invoice headers, and multi-tenant preferences",

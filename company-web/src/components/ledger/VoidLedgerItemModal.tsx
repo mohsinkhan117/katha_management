@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { AlertTriangle, Loader2, X, ShieldAlert } from "lucide-react";
+import { useUser } from "@stackframe/stack";
+import { useTenant } from "@/context/TenantContext";
 import { LedgerEntry } from "@/lib/ledger/service";
 
 interface VoidLedgerItemModalProps {
@@ -17,6 +19,8 @@ export function VoidLedgerItemModal({
   entry,
   onSuccess,
 }: VoidLedgerItemModalProps) {
+  const user = useUser();
+  const { activeTenant } = useTenant();
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +46,20 @@ export function VoidLedgerItemModal({
     setError(null);
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (activeTenant?.id) {
+        headers["x-tenant-id"] = activeTenant.id;
+      }
+      const email = user?.primaryEmail || activeTenant?.admin_email;
+      if (email) {
+        headers["x-user-email"] = email;
+      }
       const res = await fetch(`/api/ledger/entries/${entry.id}/void`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
+        credentials: "include",
         body: JSON.stringify({ reason: reason.trim() }),
       });
 

@@ -16,9 +16,11 @@ import {
   TrendingUp,
   X,
   LogOut,
+  LogIn,
   Building2,
   FileSpreadsheet,
 } from "lucide-react";
+import { useUser } from "@stackframe/stack";
 import { useTenant } from "@/context/TenantContext";
 
 interface NavItem {
@@ -92,6 +94,7 @@ export function Sidebar({
   setIsMobileOpen,
 }: SidebarProps) {
   const pathname = usePathname();
+  const user = useUser();
   const { activeTenant, tenantData, isCustomTenant, hasAccess } = useTenant();
 
   const ordersCount = isCustomTenant && hasAccess
@@ -140,10 +143,10 @@ export function Sidebar({
     ...(hasAccess
       ? [
           {
-            label: "Commercial Ledger",
+            label: "Party Khata Ledger",
             href: "/ledger",
             icon: FileSpreadsheet,
-            badge: "Admin",
+            badge: "Expense",
             badgeColor: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30",
           },
         ]
@@ -302,23 +305,33 @@ export function Sidebar({
             {(!isCollapsed || isMobileOpen) && (
               <div className="flex flex-col min-w-0">
                 <span className="text-sm font-semibold text-white truncate">
-                  {activeTenant?.name || "Company Admin"}
+                  {user?.displayName || activeTenant?.name || "Company Admin"}
                 </span>
                 <span className="text-[11px] text-slate-400 truncate">
-                  {activeTenant?.admin_email || "tenant@katha.com"}
+                  {user?.primaryEmail || activeTenant?.admin_email || "tenant@katha.com"}
                 </span>
               </div>
             )}
           </Link>
 
           {(!isCollapsed || isMobileOpen) && (
-            <Link
-              href="/handler/sign-out"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </Link>
+            user ? (
+              <Link
+                href="/handler/sign-out"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </Link>
+            ) : (
+              <Link
+                href="/handler/sign-in"
+                className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-slate-800 transition"
+                title="Sign In"
+              >
+                <LogIn className="w-4 h-4" />
+              </Link>
+            )
           )}
 
           {/* Desktop Collapse / Expand Toggle Button */}
